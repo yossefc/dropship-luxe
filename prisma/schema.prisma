@@ -46,36 +46,53 @@ model Address {
 model Product {
   id                  String    @id @default(uuid())
   aliexpressId        String    @unique @map("aliexpress_id")
-  sku                 String    @unique
+  aliexpressUrl       String?   @map("aliexpress_url")
+  sku                 String?   @unique
   // Base name kept for internal reference / fallback
-  name                String
+  name                String?
   // Original content from supplier (before AI rewriting)
-  originalName        String    @map("original_name") @db.Text
-  originalDescription String    @map("original_description") @db.Text
-  category            String
+  originalName        String?   @map("original_name") @db.Text
+  originalDescription String?   @map("original_description") @db.Text
+  categoryId          String?   @map("category_id")
   images              String[]
-  supplierPrice       Decimal   @map("supplier_price") @db.Decimal(10, 2)
-  supplierCurrency    String    @default("EUR") @map("supplier_currency")
+  // Pricing
+  basePrice           Decimal   @map("base_price") @db.Decimal(10, 2)
+  costPrice           Decimal   @map("cost_price") @db.Decimal(10, 2)
   sellingPrice        Decimal   @map("selling_price") @db.Decimal(10, 2)
-  sellingCurrency     String    @default("EUR") @map("selling_currency")
+  currency            String    @default("EUR")
+  // Physical properties
+  weight              Decimal?  @db.Decimal(6, 3) // kg
+  dimensions          Json?     // { length, width, height }
+  // Metrics
   stock               Int       @default(0)
-  rating              Decimal   @db.Decimal(2, 1)
+  rating              Decimal?  @db.Decimal(2, 1)
   orderVolume         Int       @default(0) @map("order_volume")
+  // Supplier info
   supplierId          String    @map("supplier_id")
   supplierName        String    @map("supplier_name")
-  shippingTimeMin     Int       @map("shipping_time_min")
-  shippingTimeMax     Int       @map("shipping_time_max")
+  shippingTimeMin     Int?      @map("shipping_time_min")
+  shippingTimeMax     Int?      @map("shipping_time_max")
+  // Import scoring
+  importScore         Int?      @map("import_score")
+  importScoreBreakdown Json?    @map("import_score_breakdown")
+  riskFactors         String[]  @map("risk_factors")
+  // Status flags
   isActive            Boolean   @default(true) @map("is_active")
-  lastSyncAt          DateTime  @map("last_sync_at")
+  isFeatured          Boolean   @default(false) @map("is_featured")
+  // Timestamps
+  lastSyncAt          DateTime? @map("last_sync_at")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
+  category            Category? @relation(fields: [categoryId], references: [id])
   translations        ProductTranslation[]
   variants            ProductVariant[]
   orderItems          OrderItem[]
 
-  @@index([category])
+  @@index([categoryId])
   @@index([isActive])
+  @@index([isFeatured])
+  @@index([importScore])
   @@index([lastSyncAt])
   @@map("products")
 }
@@ -124,20 +141,25 @@ model ProductTranslation {
 }
 
 model ProductVariant {
-  id          String    @id @default(uuid())
-  productId   String    @map("product_id")
-  name        String    // Base name (internal reference)
-  sku         String    @unique
-  price       Decimal   @db.Decimal(10, 2)
-  currency    String    @default("EUR")
-  stock       Int       @default(0)
-  attributes  Json      @default("{}")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id              String    @id @default(uuid())
+  productId       String    @map("product_id")
+  aliexpressSku   String?   @map("aliexpress_sku")
+  name            String    // Base name (internal reference)
+  sku             String?   @unique
+  price           Decimal   @db.Decimal(10, 2)
+  currency        String    @default("EUR")
+  stock           Int       @default(0)
+  attributes      Json      @default("{}")
+  image           String?
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  translations ProductVariantTranslation[]
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  translations    ProductVariantTranslation[]
 
+  @@index([productId])
+  @@index([isActive])
   @@map("product_variants")
 }
 
@@ -167,18 +189,21 @@ model ProductVariantTranslation {
 // ============================================================================
 
 model Category {
-  id          String    @id @default(uuid())
-  slug        String    @unique // Internal identifier
-  parentId    String?   @map("parent_id")
-  sortOrder   Int       @default(0) @map("sort_order")
-  isActive    Boolean   @default(true) @map("is_active")
-  image       String?
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  id            String    @id @default(uuid())
+  aliexpressId  String?   @unique @map("aliexpress_id")
+  name          String    // Base name for internal reference
+  slug          String    @unique // Internal identifier
+  parentId      String?   @map("parent_id")
+  sortOrder     Int       @default(0) @map("sort_order")
+  isActive      Boolean   @default(true) @map("is_active")
+  image         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   parent       Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children     Category[] @relation("CategoryHierarchy")
   translations CategoryTranslation[]
+  products     Product[]
 
   @@index([parentId])
   @@index([isActive])
@@ -322,4 +347,75 @@ enum PaymentStatus {
   failed
   cancelled
   refunded
+}
+
+// ============================================================================
+// Import History - Tracks automated product imports
+// ============================================================================
+
+model ImportHistory {
+  id                String    @id @default(uuid())
+  jobId             String    @map("job_id")
+  jobName           String    @map("job_name")
+  keywords          String[]
+
+  // Statistics
+  totalProcessed    Int       @map("total_processed")
+  importedCount     Int       @map("imported_count")
+  quarantinedCount  Int       @map("quarantined_count")
+  rejectedCount     Int       @map("rejected_count")
+  errorCount        Int       @map("error_count")
+  averageScore      Int       @map("average_score")
+  processingTimeMs  Int       @map("processing_time_ms")
+
+  // Details
+  importedProducts  String[]  @map("imported_products") // AliExpress IDs
+  errors            Json[]    // Array of { productId, stage, message }
+
+  // Timestamps
+  startedAt         DateTime  @map("started_at")
+  completedAt       DateTime  @map("completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([jobId])
+  @@index([createdAt])
+  @@map("import_history")
+}
+
+// ============================================================================
+// Product Quarantine - Products pending review
+// ============================================================================
+
+model ProductQuarantine {
+  id              String    @id @default(uuid())
+  aliexpressId    String    @unique @map("aliexpress_id")
+  title           String
+  score           Int
+  reason          String
+  productData     Json      @map("product_data")
+  shippingCost    Decimal   @map("shipping_cost") @db.Decimal(10, 2)
+  suggestedPrice  Decimal   @map("suggested_price") @db.Decimal(10, 2)
+  scoreBreakdown  Json      @map("score_breakdown")
+  riskFactors     String[]  @map("risk_factors")
+
+  // Review status
+  status          QuarantineStatus @default(pending)
+  reviewedBy      String?   @map("reviewed_by")
+  reviewedAt      DateTime? @map("reviewed_at")
+  reviewNotes     String?   @map("review_notes") @db.Text
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([score])
+  @@index([createdAt])
+  @@map("product_quarantine")
+}
+
+enum QuarantineStatus {
+  pending
+  approved
+  rejected
+  needs_review
 }

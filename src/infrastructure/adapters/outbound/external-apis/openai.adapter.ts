@@ -14,6 +14,49 @@ import { withExponentialBackoff } from '@shared/utils/retry.js';
 import { ExternalServiceError } from '@shared/errors/domain-error.js';
 
 // ============================================================================
+// COSMETIC BRAND-SAFETY GUARDRAILS
+// ============================================================================
+// CRITICAL: These rules MUST be included in all product content generation
+// to comply with EU Cosmetics Regulation (EC) No 1223/2009 and FTC guidelines
+// ============================================================================
+
+const COSMETIC_GUARDRAILS = `
+=== ⚠️ COSMETIC COMPLIANCE - MANDATORY RULES ⚠️ ===
+
+YOU MUST FOLLOW THESE RULES WITHOUT EXCEPTION:
+
+❌ NEVER USE - FORBIDDEN MEDICAL CLAIMS:
+- "treats", "cures", "heals", "therapeutic", "medicinal", "prescription"
+- "clinically proven", "dermatologically tested", "doctor recommended"
+- "treats acne/eczema/psoriasis/rosacea/dermatitis" - THESE ARE MEDICAL CONDITIONS
+- "anti-aging", "anti-wrinkle", "removes wrinkles", "eliminates fine lines"
+- "permanent results", "guaranteed results", "100% effective", "miracle"
+- "repairs skin", "regenerates cells", "heals damage"
+- Any claim suggesting the product diagnoses, treats, or cures a disease
+
+✅ USE INSTEAD - APPROVED COSMETIC LANGUAGE:
+- "helps reduce the APPEARANCE of..." (not "reduces wrinkles")
+- "minimizes the LOOK of..." (not "eliminates")
+- "visibly improves", "appears smoother", "looks more radiant"
+- "hydrates", "moisturizes", "nourishes", "conditions"
+- "enhances radiance", "illuminates complexion", "refines texture"
+- "leaves skin feeling...", "provides the sensation of..."
+
+🔄 TRANSFORMATION EXAMPLES:
+❌ "This serum treats wrinkles and cures dry skin"
+✅ "This serum helps reduce the appearance of fine lines while providing deep hydration"
+
+❌ "Clinically proven to eliminate acne"
+✅ "Formulated to help minimize the look of blemishes for a clearer-looking complexion"
+
+❌ "Anti-aging cream that reverses skin damage"
+✅ "Luxurious cream that helps diminish the visible signs of time for a more youthful appearance"
+
+REMEMBER: You are creating COSMETIC marketing content, not medical claims.
+The product enhances APPEARANCE and provides SENSORY benefits, nothing more.
+`;
+
+// ============================================================================
 // Luxury Copywriting Prompts - Culturally Adapted
 // ============================================================================
 
@@ -115,13 +158,16 @@ export class OpenAIAdapter implements AiContentService {
         const systemPrompt = `You are a luxury e-commerce copywriter specializing in high-end product descriptions.
 Your task is to transform product descriptions into compelling, SEO-optimized content.
 
+${params.category?.toLowerCase().includes('cosmetic') || params.category?.toLowerCase().includes('beauty') || params.category?.toLowerCase().includes('skincare') ? COSMETIC_GUARDRAILS : ''}
+
 Guidelines:
 - ${toneInstructions[params.targetTone]}
 - Write in ${params.targetLanguage}
 - Never mention the original source or manufacturer
-- Focus on benefits, not just features
+- Focus on APPEARANCE benefits and sensory experience, not medical claims
 - Include sensory language and emotional triggers
 - Optimize for SEO without keyword stuffing
+- For cosmetics: use "helps reduce the appearance of" instead of medical claims
 ${params.maxLength != null ? `- Keep the description under ${params.maxLength} characters` : ''}
 
 Output format (JSON):
@@ -311,14 +357,17 @@ ${localeConfig.brandVoice}
 === SEO OPTIMIZATION ===
 ${localeConfig.seoFocus}
 
-=== STRICT GUIDELINES ===
+${COSMETIC_GUARDRAILS}
+
+=== STRICT CONTENT GUIDELINES ===
 1. NEVER mention AliExpress, China, wholesale, dropshipping, or any supplier references
 2. NEVER use generic e-commerce language ("Buy now!", "Limited offer!")
 3. Create content that feels like it belongs to a prestigious French/Italian beauty house
-4. Focus on TRANSFORMATION and EXPERIENCE, not just features
+4. Focus on SENSORY EXPERIENCE and APPEARANCE benefits, not medical claims
 5. Use sensory language: textures, scents, feelings, rituals
 6. Make the customer feel they're discovering an exclusive secret
 7. SEO keywords must feel natural, never forced
+8. ALL claims must be cosmetic (appearance-based), NEVER therapeutic
 
 === OUTPUT FORMAT (JSON) ===
 {
