@@ -1,0 +1,42 @@
+{
+  "hero": {
+    "overline": "Nueva Colección",
+    "title": "Colección Primavera",
+    "subtitle": "Descubre la elegancia atemporal"
+  },
+  "philosophy": {
+    "overline": "Nuestra Filosofía",
+    "title": "Belleza Auténtica",
+    "description": "Descubre fórmulas excepcionales, creadas para realzar tu belleza natural."
+  },
+  "featured": {
+    "overline": "Selección",
+    "title": "Los Más Vendidos",
+    "description": "Los productos favoritos de nuestra comunidad"
+  },
+  "categories": {
+    "skincare": {
+      "title": "Cuidado Facial",
+      "subtitle": "Luminosidad & Juventud"
+    },
+    "makeup": {
+      "title": "Maquillaje",
+      "subtitle": "Realza tu belleza"
+    },
+    "fragrances": {
+      "title": "Perfumes",
+      "subtitle": "Firmas olfativas"
+    }
+  },
+  "shipping": {
+    "title": "Envío gratuito",
+    "description": "Disfruta del envío gratuito en pedidos superiores a 50€ en España peninsular."
+  },
+  "newsletter": {
+    "title": "Únete al círculo",
+    "description": "Sé la primera en descubrir novedades y ofertas exclusivas.",
+    "placeholder": "Tu email",
+    "success": "¡Bienvenida al círculo!",
+    "error": "Ha ocurrido un error. Por favor, inténtalo de nuevo."
+  }
+}

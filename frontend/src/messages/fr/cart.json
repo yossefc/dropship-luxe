@@ -1,0 +1,34 @@
+{
+  "title": "Votre panier",
+  "empty": {
+    "title": "Votre panier est vide",
+    "description": "Découvrez notre sélection de produits d'exception.",
+    "cta": "Continuer mes achats"
+  },
+  "item": {
+    "remove": "Supprimer",
+    "quantity": "Quantité",
+    "unitPrice": "Prix unitaire",
+    "total": "Total"
+  },
+  "summary": {
+    "subtotal": "Sous-total",
+    "shipping": "Livraison",
+    "shippingFree": "Offerte",
+    "shippingCalculated": "Calculée à l'étape suivante",
+    "tax": "TVA incluse",
+    "total": "Total",
+    "freeShippingProgress": "Plus que {amount} pour la livraison offerte"
+  },
+  "actions": {
+    "checkout": "Passer commande",
+    "continueShopping": "Continuer mes achats",
+    "applyCoupon": "Appliquer un code promo",
+    "removeCoupon": "Retirer le code"
+  },
+  "notifications": {
+    "added": "Ajouté au panier",
+    "removed": "Retiré du panier",
+    "updated": "Panier mis à jour"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "title": "Il tuo carrello",
+  "empty": {
+    "title": "Il tuo carrello è vuoto",
+    "description": "Scopri la nostra selezione di prodotti eccezionali.",
+    "cta": "Continua lo shopping"
+  },
+  "item": {
+    "remove": "Rimuovi",
+    "quantity": "Quantità",
+    "unitPrice": "Prezzo unitario",
+    "total": "Totale"
+  },
+  "summary": {
+    "subtotal": "Subtotale",
+    "shipping": "Spedizione",
+    "shippingFree": "Gratuita",
+    "shippingCalculated": "Calcolata al checkout",
+    "tax": "IVA inclusa",
+    "total": "Totale",
+    "freeShippingProgress": "Mancano {amount} per la spedizione gratuita"
+  },
+  "actions": {
+    "checkout": "Procedi al checkout",
+    "continueShopping": "Continua lo shopping",
+    "applyCoupon": "Applica codice promozionale",
+    "removeCoupon": "Rimuovi codice"
+  },
+  "notifications": {
+    "added": "Aggiunto al carrello",
+    "removed": "Rimosso dal carrello",
+    "updated": "Carrello aggiornato"
+  }
+}

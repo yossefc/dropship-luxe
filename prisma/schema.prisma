@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  firstName         String    @map("first_name")
+  lastName          String    @map("last_name")
+  phone             String?
+  stripeCustomerId  String?   @unique @map("stripe_customer_id")
+  isVerified        Boolean   @default(false) @map("is_verified")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  addresses         Address[]
+  orders            Order[]
+
+  @@map("customers")
+}
+
+model Address {
+  id              String    @id @default(uuid())
+  customerId      String    @map("customer_id")
+  firstName       String    @map("first_name")
+  lastName        String    @map("last_name")
+  street          String
+  city            String
+  postalCode      String    @map("postal_code")
+  country         String
+  phone           String?
+  isDefault       Boolean   @default(false) @map("is_default")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("addresses")
+}
+
+model Product {
+  id                  String    @id @default(uuid())
+  aliexpressId        String    @unique @map("aliexpress_id")
+  sku                 String    @unique
+  name                String
+  description         String    @db.Text
+  descriptionHtml     String    @map("description_html") @db.Text
+  originalDescription String    @map("original_description") @db.Text
+  category            String
+  images              String[]
+  supplierPrice       Decimal   @map("supplier_price") @db.Decimal(10, 2)
+  supplierCurrency    String    @default("EUR") @map("supplier_currency")
+  sellingPrice        Decimal   @map("selling_price") @db.Decimal(10, 2)
+  sellingCurrency     String    @default("EUR") @map("selling_currency")
+  stock               Int       @default(0)
+  rating              Decimal   @db.Decimal(2, 1)
+  orderVolume         Int       @default(0) @map("order_volume")
+  supplierId          String    @map("supplier_id")
+  supplierName        String    @map("supplier_name")
+  shippingTimeMin     Int       @map("shipping_time_min")
+  shippingTimeMax     Int       @map("shipping_time_max")
+  isActive            Boolean   @default(true) @map("is_active")
+  lastSyncAt          DateTime  @map("last_sync_at")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  variants            ProductVariant[]
+  orderItems          OrderItem[]
+
+  @@index([category])
+  @@index([isActive])
+  @@index([lastSyncAt])
+  @@map("products")
+}
+
+model ProductVariant {
+  id          String    @id @default(uuid())
+  productId   String    @map("product_id")
+  name        String
+  sku         String    @unique
+  price       Decimal   @db.Decimal(10, 2)
+  currency    String    @default("EUR")
+  stock       Int       @default(0)
+  attributes  Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_variants")
+}
+
+model Order {
+  id                    String        @id @default(uuid())
+  orderNumber           String        @unique @map("order_number")
+  customerId            String        @map("customer_id")
+  customerEmail         String        @map("customer_email")
+
+  // Shipping Address
+  shippingFirstName     String        @map("shipping_first_name")
+  shippingLastName      String        @map("shipping_last_name")
+  shippingStreet        String        @map("shipping_street")
+  shippingCity          String        @map("shipping_city")
+  shippingPostalCode    String        @map("shipping_postal_code")
+  shippingCountry       String        @map("shipping_country")
+  shippingPhone         String?       @map("shipping_phone")
+
+  // Billing Address
+  billingFirstName      String        @map("billing_first_name")
+  billingLastName       String        @map("billing_last_name")
+  billingStreet         String        @map("billing_street")
+  billingCity           String        @map("billing_city")
+  billingPostalCode     String        @map("billing_postal_code")
+  billingCountry        String        @map("billing_country")
+  billingPhone          String?       @map("billing_phone")
+
+  // Amounts
+  subtotal              Decimal       @db.Decimal(10, 2)
+  shippingCost          Decimal       @map("shipping_cost") @db.Decimal(10, 2)
+  tax                   Decimal       @db.Decimal(10, 2)
+  total                 Decimal       @db.Decimal(10, 2)
+  currency              String        @default("EUR")
+
+  // Status
+  status                OrderStatus   @default(pending)
+  paymentStatus         PaymentStatus @default(pending) @map("payment_status")
+  stripePaymentIntentId String?       @map("stripe_payment_intent_id")
+
+  // Supplier Orders
+  aliexpressOrderIds    String[]      @map("aliexpress_order_ids")
+  trackingNumbers       String[]      @map("tracking_numbers")
+
+  notes                 String?       @db.Text
+
+  // Timestamps
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+  paidAt                DateTime?     @map("paid_at")
+  shippedAt             DateTime?     @map("shipped_at")
+  deliveredAt           DateTime?     @map("delivered_at")
+
+  customer              Customer      @relation(fields: [customerId], references: [id])
+  items                 OrderItem[]
+
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id            String    @id @default(uuid())
+  orderId       String    @map("order_id")
+  productId     String    @map("product_id")
+  productName   String    @map("product_name")
+  sku           String
+  quantity      Int
+  unitPrice     Decimal   @map("unit_price") @db.Decimal(10, 2)
+  supplierPrice Decimal   @map("supplier_price") @db.Decimal(10, 2)
+  currency      String    @default("EUR")
+  variantId     String?   @map("variant_id")
+  variantName   String?   @map("variant_name")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product   @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String?   @map("user_id")
+  action      String
+  entity      String
+  entityId    String?   @map("entity_id")
+  changes     Json?
+  ipAddress   String?   @map("ip_address")
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+enum OrderStatus {
+  pending
+  paid
+  processing
+  shipped
+  delivered
+  cancelled
+  refunded
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  succeeded
+  failed
+  cancelled
+  refunded
+}

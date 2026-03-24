@@ -1,0 +1,45 @@
+{
+  "brand": {
+    "name": "Dropship Luxe",
+    "tagline": "Bellezza di Alta Gamma"
+  },
+  "nav": {
+    "collections": "Collezioni",
+    "skincare": "Skincare",
+    "makeup": "Trucco",
+    "fragrances": "Profumi",
+    "about": "Chi siamo",
+    "contact": "Contatti"
+  },
+  "cta": {
+    "shopNow": "Acquista ora",
+    "learnMore": "Scopri di più",
+    "viewAll": "Vedi tutto",
+    "viewCollection": "Scopri la collezione",
+    "subscribe": "Iscriviti",
+    "addToCart": "Aggiungi al carrello",
+    "buyNow": "Acquista ora",
+    "continueShopping": "Continua lo shopping"
+  },
+  "badges": {
+    "new": "Novità",
+    "bestseller": "Best seller",
+    "sale": "Saldi",
+    "exclusive": "Esclusivo",
+    "limitedEdition": "Edizione Limitata"
+  },
+  "footer": {
+    "rights": "Tutti i diritti riservati",
+    "privacy": "Privacy Policy",
+    "terms": "Termini e condizioni",
+    "shipping": "Spedizioni",
+    "returns": "Resi"
+  },
+  "accessibility": {
+    "openCart": "Apri carrello",
+    "closeCart": "Chiudi carrello",
+    "menuOpen": "Apri menu",
+    "menuClose": "Chiudi menu",
+    "languageSelector": "Seleziona lingua"
+  }
+}

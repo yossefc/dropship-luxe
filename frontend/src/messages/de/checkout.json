@@ -1,0 +1,64 @@
+{
+  "steps": {
+    "information": "Informationen",
+    "shipping": "Versand",
+    "payment": "Zahlung",
+    "confirmation": "Bestätigung"
+  },
+  "contact": {
+    "title": "Kontakt",
+    "email": "E-Mail",
+    "phone": "Telefon",
+    "newsletter": "Newsletter abonnieren"
+  },
+  "shipping": {
+    "title": "Lieferadresse",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "address": "Adresse",
+    "apartment": "Wohnung, Etage, etc. (optional)",
+    "city": "Stadt",
+    "country": "Land",
+    "postalCode": "PLZ",
+    "saveAddress": "Diese Adresse speichern"
+  },
+  "shippingMethod": {
+    "title": "Versandart",
+    "standard": "Standard (5-7 Tage)",
+    "express": "Express (2-3 Tage)",
+    "overnight": "Lieferung am nächsten Tag"
+  },
+  "billing": {
+    "title": "Rechnungsadresse",
+    "sameAsShipping": "Wie Lieferadresse",
+    "different": "Andere Adresse verwenden"
+  },
+  "payment": {
+    "title": "Zahlung",
+    "cardNumber": "Kartennummer",
+    "expiry": "Gültig bis",
+    "cvv": "CVV",
+    "nameOnCard": "Name auf der Karte",
+    "securePayment": "100% sichere Zahlung"
+  },
+  "confirmation": {
+    "title": "Bestellung bestätigt!",
+    "thankYou": "Vielen Dank für Ihre Bestellung",
+    "orderNumber": "Bestellnummer",
+    "emailSent": "Bestätigungsmail wurde an {email} gesendet",
+    "trackOrder": "Bestellung verfolgen"
+  },
+  "actions": {
+    "continue": "Weiter",
+    "back": "Zurück",
+    "placeOrder": "Bestellung aufgeben",
+    "processing": "Wird verarbeitet..."
+  },
+  "errors": {
+    "required": "Pflichtfeld",
+    "invalidEmail": "Ungültige E-Mail-Adresse",
+    "invalidPhone": "Ungültige Telefonnummer",
+    "invalidCard": "Ungültige Kartennummer",
+    "paymentFailed": "Zahlung fehlgeschlagen. Bitte erneut versuchen."
+  }
+}

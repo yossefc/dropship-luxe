@@ -1,0 +1,34 @@
+{
+  "title": "Your Bag",
+  "empty": {
+    "title": "Your bag is empty",
+    "description": "Discover our curated selection of exceptional products.",
+    "cta": "Continue Shopping"
+  },
+  "item": {
+    "remove": "Remove",
+    "quantity": "Quantity",
+    "unitPrice": "Unit Price",
+    "total": "Total"
+  },
+  "summary": {
+    "subtotal": "Subtotal",
+    "shipping": "Shipping",
+    "shippingFree": "Complimentary",
+    "shippingCalculated": "Calculated at checkout",
+    "tax": "VAT included",
+    "total": "Total",
+    "freeShippingProgress": "Only {amount} away from free shipping"
+  },
+  "actions": {
+    "checkout": "Proceed to Checkout",
+    "continueShopping": "Continue Shopping",
+    "applyCoupon": "Apply Promo Code",
+    "removeCoupon": "Remove Code"
+  },
+  "notifications": {
+    "added": "Added to bag",
+    "removed": "Removed from bag",
+    "updated": "Bag updated"
+  }
+}

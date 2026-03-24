@@ -1,0 +1,64 @@
+{
+  "steps": {
+    "information": "Informations",
+    "shipping": "Livraison",
+    "payment": "Paiement",
+    "confirmation": "Confirmation"
+  },
+  "contact": {
+    "title": "Contact",
+    "email": "Email",
+    "phone": "Téléphone",
+    "newsletter": "M'inscrire à la newsletter"
+  },
+  "shipping": {
+    "title": "Adresse de livraison",
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "address": "Adresse",
+    "apartment": "Appartement, suite, etc. (optionnel)",
+    "city": "Ville",
+    "country": "Pays",
+    "postalCode": "Code postal",
+    "saveAddress": "Sauvegarder cette adresse"
+  },
+  "shippingMethod": {
+    "title": "Mode de livraison",
+    "standard": "Standard (5-7 jours)",
+    "express": "Express (2-3 jours)",
+    "overnight": "Express 24h"
+  },
+  "billing": {
+    "title": "Adresse de facturation",
+    "sameAsShipping": "Identique à l'adresse de livraison",
+    "different": "Utiliser une adresse différente"
+  },
+  "payment": {
+    "title": "Paiement",
+    "cardNumber": "Numéro de carte",
+    "expiry": "Date d'expiration",
+    "cvv": "CVV",
+    "nameOnCard": "Nom sur la carte",
+    "securePayment": "Paiement 100% sécurisé"
+  },
+  "confirmation": {
+    "title": "Commande confirmée !",
+    "thankYou": "Merci pour votre commande",
+    "orderNumber": "Numéro de commande",
+    "emailSent": "Un email de confirmation a été envoyé à {email}",
+    "trackOrder": "Suivre ma commande"
+  },
+  "actions": {
+    "continue": "Continuer",
+    "back": "Retour",
+    "placeOrder": "Confirmer la commande",
+    "processing": "Traitement en cours..."
+  },
+  "errors": {
+    "required": "Ce champ est obligatoire",
+    "invalidEmail": "Email invalide",
+    "invalidPhone": "Numéro de téléphone invalide",
+    "invalidCard": "Numéro de carte invalide",
+    "paymentFailed": "Le paiement a échoué. Veuillez réessayer."
+  }
+}

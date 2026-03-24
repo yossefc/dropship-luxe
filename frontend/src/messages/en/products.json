@@ -1,0 +1,40 @@
+{
+  "details": {
+    "description": "Description",
+    "ingredients": "Ingredients",
+    "howToUse": "How to Use",
+    "benefits": "Benefits",
+    "reviews": "Reviews"
+  },
+  "variants": {
+    "color": "Colour",
+    "size": "Size",
+    "shade": "Shade",
+    "quantity": "Quantity"
+  },
+  "stock": {
+    "inStock": "In Stock",
+    "lowStock": "Only {count} left",
+    "outOfStock": "Out of Stock",
+    "backOrder": "Available in 2-3 weeks"
+  },
+  "shipping": {
+    "estimatedDelivery": "Estimated Delivery",
+    "freeShipping": "Complimentary Shipping",
+    "expressAvailable": "Express Available"
+  },
+  "reviews": {
+    "title": "Customer Reviews",
+    "rating": "{rating} out of 5",
+    "count": "{count} reviews",
+    "writeReview": "Write a Review",
+    "verifiedPurchase": "Verified Purchase",
+    "helpful": "Helpful",
+    "reportReview": "Report"
+  },
+  "recommendations": {
+    "title": "You May Also Love",
+    "recentlyViewed": "Recently Viewed",
+    "complementary": "Complete Your Routine"
+  }
+}

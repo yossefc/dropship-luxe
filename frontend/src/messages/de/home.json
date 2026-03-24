@@ -1,0 +1,42 @@
+{
+  "hero": {
+    "overline": "Neue Kollektion",
+    "title": "Frühlingskollektion",
+    "subtitle": "Entdecken Sie zeitlose Eleganz"
+  },
+  "philosophy": {
+    "overline": "Unsere Philosophie",
+    "title": "Authentische Schönheit",
+    "description": "Entdecken Sie außergewöhnliche Formeln, entwickelt um Ihre natürliche Schönheit zu unterstreichen."
+  },
+  "featured": {
+    "overline": "Auswahl",
+    "title": "Unsere Bestseller",
+    "description": "Die Lieblingsprodukte unserer Community"
+  },
+  "categories": {
+    "skincare": {
+      "title": "Hautpflege",
+      "subtitle": "Strahlkraft & Jugend"
+    },
+    "makeup": {
+      "title": "Make-up",
+      "subtitle": "Betonen Sie Ihre Schönheit"
+    },
+    "fragrances": {
+      "title": "Düfte",
+      "subtitle": "Duft-Signaturen"
+    }
+  },
+  "shipping": {
+    "title": "Kostenloser Versand",
+    "description": "Kostenloser Versand ab 50€ Bestellwert innerhalb Deutschlands."
+  },
+  "newsletter": {
+    "title": "Werden Sie Teil des Kreises",
+    "description": "Erhalten Sie exklusiven Zugang zu Neuheiten und besonderen Angeboten.",
+    "placeholder": "Ihre E-Mail",
+    "success": "Willkommen im Kreis!",
+    "error": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut."
+  }
+}

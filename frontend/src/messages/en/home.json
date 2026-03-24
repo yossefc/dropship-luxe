@@ -1,0 +1,42 @@
+{
+  "hero": {
+    "overline": "New Collection",
+    "title": "Spring Collection",
+    "subtitle": "Discover timeless elegance"
+  },
+  "philosophy": {
+    "overline": "Our Philosophy",
+    "title": "Authentic Beauty",
+    "description": "Discover exceptional formulas, crafted to enhance your natural radiance."
+  },
+  "featured": {
+    "overline": "Curated Selection",
+    "title": "Our Bestsellers",
+    "description": "The products loved by our community"
+  },
+  "categories": {
+    "skincare": {
+      "title": "Skincare",
+      "subtitle": "Radiance & Youth"
+    },
+    "makeup": {
+      "title": "Makeup",
+      "subtitle": "Enhance Your Beauty"
+    },
+    "fragrances": {
+      "title": "Fragrances",
+      "subtitle": "Signature Scents"
+    }
+  },
+  "shipping": {
+    "title": "Complimentary Shipping",
+    "description": "Enjoy free delivery on orders over £50 across the UK."
+  },
+  "newsletter": {
+    "title": "Join the Circle",
+    "description": "Be the first to discover new arrivals and exclusive offers.",
+    "placeholder": "Your email",
+    "success": "Welcome to the circle!",
+    "error": "Something went wrong. Please try again."
+  }
+}

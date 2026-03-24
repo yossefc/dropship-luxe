@@ -1,0 +1,40 @@
+{
+  "details": {
+    "description": "Description",
+    "ingredients": "Ingrédients",
+    "howToUse": "Conseils d'utilisation",
+    "benefits": "Bénéfices",
+    "reviews": "Avis clients"
+  },
+  "variants": {
+    "color": "Couleur",
+    "size": "Taille",
+    "shade": "Teinte",
+    "quantity": "Quantité"
+  },
+  "stock": {
+    "inStock": "En stock",
+    "lowStock": "Plus que {count} en stock",
+    "outOfStock": "Rupture de stock",
+    "backOrder": "Disponible sous 2-3 semaines"
+  },
+  "shipping": {
+    "estimatedDelivery": "Livraison estimée",
+    "freeShipping": "Livraison offerte",
+    "expressAvailable": "Express disponible"
+  },
+  "reviews": {
+    "title": "Avis clients",
+    "rating": "{rating} sur 5",
+    "count": "{count} avis",
+    "writeReview": "Donner mon avis",
+    "verifiedPurchase": "Achat vérifié",
+    "helpful": "Utile",
+    "reportReview": "Signaler"
+  },
+  "recommendations": {
+    "title": "Vous aimerez aussi",
+    "recentlyViewed": "Récemment consultés",
+    "complementary": "Complétez votre routine"
+  }
+}

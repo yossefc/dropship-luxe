@@ -1,0 +1,42 @@
+{
+  "hero": {
+    "overline": "Nuova Collezione",
+    "title": "Collezione Primavera",
+    "subtitle": "Scopri l'eleganza senza tempo"
+  },
+  "philosophy": {
+    "overline": "La Nostra Filosofia",
+    "title": "Bellezza Autentica",
+    "description": "Scopri formule eccezionali, create per esaltare la tua bellezza naturale."
+  },
+  "featured": {
+    "overline": "Selezione",
+    "title": "I Più Amati",
+    "description": "I prodotti preferiti dalla nostra community"
+  },
+  "categories": {
+    "skincare": {
+      "title": "Skincare",
+      "subtitle": "Luminosità & Giovinezza"
+    },
+    "makeup": {
+      "title": "Trucco",
+      "subtitle": "Esalta la tua bellezza"
+    },
+    "fragrances": {
+      "title": "Profumi",
+      "subtitle": "Firme olfattive"
+    }
+  },
+  "shipping": {
+    "title": "Spedizione gratuita",
+    "description": "Spedizione gratuita per ordini superiori a 50€ in Italia."
+  },
+  "newsletter": {
+    "title": "Entra nel cerchio",
+    "description": "Scopri in anteprima le novità e le offerte esclusive.",
+    "placeholder": "La tua email",
+    "success": "Benvenuta nel cerchio!",
+    "error": "Si è verificato un errore. Riprova."
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "title": "Tu cesta",
+  "empty": {
+    "title": "Tu cesta está vacía",
+    "description": "Descubre nuestra selección de productos excepcionales.",
+    "cta": "Seguir comprando"
+  },
+  "item": {
+    "remove": "Eliminar",
+    "quantity": "Cantidad",
+    "unitPrice": "Precio unitario",
+    "total": "Total"
+  },
+  "summary": {
+    "subtotal": "Subtotal",
+    "shipping": "Envío",
+    "shippingFree": "Gratuito",
+    "shippingCalculated": "Calculado en el siguiente paso",
+    "tax": "IVA incluido",
+    "total": "Total",
+    "freeShippingProgress": "Te faltan {amount} para el envío gratuito"
+  },
+  "actions": {
+    "checkout": "Finalizar compra",
+    "continueShopping": "Seguir comprando",
+    "applyCoupon": "Aplicar código promocional",
+    "removeCoupon": "Eliminar código"
+  },
+  "notifications": {
+    "added": "Añadido a la cesta",
+    "removed": "Eliminado de la cesta",
+    "updated": "Cesta actualizada"
+  }
+}

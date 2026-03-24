@@ -1,0 +1,34 @@
+{
+  "title": "Ihr Warenkorb",
+  "empty": {
+    "title": "Ihr Warenkorb ist leer",
+    "description": "Entdecken Sie unsere Auswahl außergewöhnlicher Produkte.",
+    "cta": "Weiter einkaufen"
+  },
+  "item": {
+    "remove": "Entfernen",
+    "quantity": "Menge",
+    "unitPrice": "Stückpreis",
+    "total": "Gesamt"
+  },
+  "summary": {
+    "subtotal": "Zwischensumme",
+    "shipping": "Versand",
+    "shippingFree": "Kostenlos",
+    "shippingCalculated": "Wird im nächsten Schritt berechnet",
+    "tax": "MwSt. inklusive",
+    "total": "Gesamtsumme",
+    "freeShippingProgress": "Noch {amount} bis zum kostenlosen Versand"
+  },
+  "actions": {
+    "checkout": "Zur Kasse",
+    "continueShopping": "Weiter einkaufen",
+    "applyCoupon": "Gutscheincode einlösen",
+    "removeCoupon": "Code entfernen"
+  },
+  "notifications": {
+    "added": "Zum Warenkorb hinzugefügt",
+    "removed": "Aus dem Warenkorb entfernt",
+    "updated": "Warenkorb aktualisiert"
+  }
+}

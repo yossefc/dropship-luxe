@@ -1,0 +1,421 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * BENTO GRID SYSTEM
+ * Structure modulaire harmonieuse pour le contenu de luxe
+ * Hiérarchie claire sans surcharge visuelle
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE GRID CONTAINER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.bento-container {
+  display: grid;
+  gap: var(--gap-bento-mobile);
+  padding: var(--space-element);
+  max-width: var(--container-full);
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .bento-container {
+    gap: var(--gap-bento-tablet);
+    padding: var(--space-block);
+  }
+}
+
+@media (min-width: 1024px) {
+  .bento-container {
+    gap: var(--gap-bento-desktop);
+    padding: var(--space-section);
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   GRID LAYOUTS - Mobile First
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* --- 2 Column Grid --- */
+.bento-grid-2 {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .bento-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* --- 3 Column Grid --- */
+.bento-grid-3 {
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .bento-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .bento-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* --- 4 Column Grid --- */
+.bento-grid-4 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 768px) {
+  .bento-grid-4 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .bento-grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ASYMMETRIC BENTO LAYOUTS - Pour la créativité visuelle
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Layout Hero: Grande image + 2 petites */
+.bento-hero {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto;
+}
+
+@media (min-width: 768px) {
+  .bento-hero {
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: repeat(2, minmax(200px, 1fr));
+  }
+
+  .bento-hero > .bento-cell:first-child {
+    grid-row: span 2;
+  }
+}
+
+/* Layout Featured: 1 grande + 3 petites */
+.bento-featured {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto;
+}
+
+@media (min-width: 768px) {
+  .bento-featured {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, minmax(180px, auto));
+  }
+
+  .bento-featured > .bento-cell:first-child {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+}
+
+/* Layout Magazine: Asymétrique créatif */
+.bento-magazine {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto;
+}
+
+@media (min-width: 768px) {
+  .bento-magazine {
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(3, minmax(150px, auto));
+  }
+
+  .bento-magazine > .bento-cell:nth-child(1) {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+
+  .bento-magazine > .bento-cell:nth-child(4) {
+    grid-column: span 2;
+  }
+
+  .bento-magazine > .bento-cell:nth-child(5) {
+    grid-column: span 2;
+    grid-row: span 2;
+  }
+}
+
+/* Layout Masonry-like */
+.bento-masonry {
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: minmax(120px, auto);
+  grid-auto-flow: dense;
+}
+
+@media (min-width: 768px) {
+  .bento-masonry {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .bento-masonry {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.bento-masonry > .bento-cell--tall {
+  grid-row: span 2;
+}
+
+.bento-masonry > .bento-cell--wide {
+  grid-column: span 2;
+}
+
+.bento-masonry > .bento-cell--featured {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BENTO CELL - La boîte modulaire
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.bento-cell {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-primary);
+  border-radius: var(--radius-lg);
+  transition:
+    transform var(--duration-normal) var(--ease-luxury),
+    box-shadow var(--duration-normal) var(--ease-luxury);
+}
+
+/* Subtle elevation on hover */
+.bento-cell:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-luxury);
+}
+
+/* --- Cell Variants --- */
+.bento-cell--image {
+  aspect-ratio: 1 / 1;
+}
+
+.bento-cell--image-landscape {
+  aspect-ratio: 16 / 9;
+}
+
+.bento-cell--image-portrait {
+  aspect-ratio: 3 / 4;
+}
+
+.bento-cell--dark {
+  background: var(--surface-dark);
+  color: var(--text-inverse);
+}
+
+.bento-cell--accent {
+  background: var(--color-secondary-navy);
+  color: var(--text-inverse);
+}
+
+.bento-cell--bordered {
+  border: var(--border-thin) solid var(--border-color-subtle);
+}
+
+.bento-cell--no-hover:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CELL CONTENT LAYOUTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Image inside cell */
+.bento-cell__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--duration-slow) var(--ease-luxury);
+}
+
+.bento-cell:hover .bento-cell__image {
+  transform: scale(1.03);
+}
+
+/* Overlay gradient for text on image */
+.bento-cell__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(10, 10, 15, 0.8) 0%,
+    rgba(10, 10, 15, 0.4) 40%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+.bento-cell__overlay--subtle {
+  background: linear-gradient(
+    to top,
+    rgba(10, 10, 15, 0.5) 0%,
+    transparent 60%
+  );
+}
+
+/* Content positioned at bottom */
+.bento-cell__content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--space-6);
+  color: var(--color-neutral-100);
+  z-index: 1;
+}
+
+@media (max-width: 767px) {
+  .bento-cell__content {
+    padding: var(--space-4);
+  }
+}
+
+/* Content filling cell */
+.bento-cell__content--fill {
+  position: relative;
+  padding: var(--space-8);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Centered content */
+.bento-cell__content--centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRODUCT GRID - Optimized for e-commerce
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.bento-products {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (min-width: 640px) {
+  .bento-products {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .bento-products {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .bento-products {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Product cell specific styling */
+.bento-cell--product {
+  aspect-ratio: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.bento-cell--product .bento-cell__image-container {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: var(--color-neutral-100);
+}
+
+.bento-cell--product .bento-cell__image {
+  position: absolute;
+}
+
+.bento-cell--product .bento-cell__info {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-grow: 1;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE SPACING
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Section spacing */
+.bento-section {
+  padding-top: var(--space-section);
+  padding-bottom: var(--space-section);
+}
+
+/* Inner padding for cells with text */
+.bento-cell--padded {
+  padding: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .bento-cell--padded {
+    padding: var(--space-8);
+  }
+}
+
+@media (min-width: 1024px) {
+  .bento-cell--padded {
+    padding: var(--space-10);
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THUMB ZONE OPTIMIZATION - Mobile Navigation
+   Actions clés accessibles au pouce
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 767px) {
+  /* Move important actions to bottom of screen */
+  .bento-actions-mobile {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: var(--space-4);
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0));
+    background: var(--surface-primary);
+    border-top: var(--border-thin) solid var(--border-color-subtle);
+    z-index: var(--z-fixed);
+    display: flex;
+    gap: var(--space-3);
+  }
+
+  /* Add padding to main content to account for fixed actions */
+  .bento-container--has-mobile-actions {
+    padding-bottom: calc(var(--space-20) + env(safe-area-inset-bottom, 0));
+  }
+}

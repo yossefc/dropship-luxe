@@ -1,0 +1,64 @@
+{
+  "steps": {
+    "information": "Information",
+    "shipping": "Shipping",
+    "payment": "Payment",
+    "confirmation": "Confirmation"
+  },
+  "contact": {
+    "title": "Contact",
+    "email": "Email",
+    "phone": "Phone",
+    "newsletter": "Subscribe to our newsletter"
+  },
+  "shipping": {
+    "title": "Shipping Address",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "address": "Address",
+    "apartment": "Flat, suite, etc. (optional)",
+    "city": "City",
+    "country": "Country",
+    "postalCode": "Postcode",
+    "saveAddress": "Save this address"
+  },
+  "shippingMethod": {
+    "title": "Shipping Method",
+    "standard": "Standard (5-7 days)",
+    "express": "Express (2-3 days)",
+    "overnight": "Next Day Delivery"
+  },
+  "billing": {
+    "title": "Billing Address",
+    "sameAsShipping": "Same as shipping address",
+    "different": "Use a different address"
+  },
+  "payment": {
+    "title": "Payment",
+    "cardNumber": "Card Number",
+    "expiry": "Expiry Date",
+    "cvv": "CVV",
+    "nameOnCard": "Name on Card",
+    "securePayment": "100% Secure Payment"
+  },
+  "confirmation": {
+    "title": "Order Confirmed!",
+    "thankYou": "Thank you for your order",
+    "orderNumber": "Order Number",
+    "emailSent": "A confirmation email has been sent to {email}",
+    "trackOrder": "Track My Order"
+  },
+  "actions": {
+    "continue": "Continue",
+    "back": "Back",
+    "placeOrder": "Place Order",
+    "processing": "Processing..."
+  },
+  "errors": {
+    "required": "This field is required",
+    "invalidEmail": "Invalid email address",
+    "invalidPhone": "Invalid phone number",
+    "invalidCard": "Invalid card number",
+    "paymentFailed": "Payment failed. Please try again."
+  }
+}

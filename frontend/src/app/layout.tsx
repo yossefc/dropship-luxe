@@ -1,0 +1,56 @@
+import type { Metadata } from 'next';
+import { Inter, Playfair_Display, Cormorant, Montserrat } from 'next/font/google';
+import '@/styles/globals.css';
+import { CartProvider } from '@/components/cart/cart-provider';
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-playfair',
+  display: 'swap',
+});
+
+const cormorant = Cormorant({
+  subsets: ['latin'],
+  variable: '--font-cormorant',
+  display: 'swap',
+});
+
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  variable: '--font-montserrat',
+  display: 'swap',
+});
+
+export const metadata: Metadata = {
+  title: {
+    default: 'Dropship Luxe | Beauté Haut de Gamme',
+    template: '%s | Dropship Luxe',
+  },
+  description: 'Découvrez notre sélection exclusive de produits de beauté haut de gamme. Livraison offerte dès 50€.',
+  keywords: ['beauté', 'luxe', 'cosmétiques', 'skincare', 'maquillage'],
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}): JSX.Element {
+  return (
+    <html
+      lang="fr"
+      className={`${inter.variable} ${playfair.variable} ${cormorant.variable} ${montserrat.variable}`}
+    >
+      <body className="font-body bg-neutral-50 text-primary-800 antialiased">
+        <CartProvider>
+          {children}
+        </CartProvider>
+      </body>
+    </html>
+  );
+}

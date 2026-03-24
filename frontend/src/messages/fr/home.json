@@ -1,0 +1,42 @@
+{
+  "hero": {
+    "overline": "Nouvelle Collection",
+    "title": "Collection Printemps",
+    "subtitle": "Découvrez l'élégance intemporelle"
+  },
+  "philosophy": {
+    "overline": "Notre philosophie",
+    "title": "La beauté authentique",
+    "description": "Découvrez des formules d'exception, créées pour sublimer votre beauté naturelle."
+  },
+  "featured": {
+    "overline": "Sélection",
+    "title": "Nos Best-sellers",
+    "description": "Les produits plébiscités par notre communauté"
+  },
+  "categories": {
+    "skincare": {
+      "title": "Soins Visage",
+      "subtitle": "Éclat & Jeunesse"
+    },
+    "makeup": {
+      "title": "Maquillage",
+      "subtitle": "Sublimez-vous"
+    },
+    "fragrances": {
+      "title": "Parfums",
+      "subtitle": "Signatures olfactives"
+    }
+  },
+  "shipping": {
+    "title": "Livraison offerte",
+    "description": "Dès 50€ d'achat, profitez de la livraison offerte en France métropolitaine."
+  },
+  "newsletter": {
+    "title": "Rejoignez le cercle",
+    "description": "Recevez en avant-première nos nouveautés et offres exclusives.",
+    "placeholder": "Votre email",
+    "success": "Bienvenue dans le cercle !",
+    "error": "Une erreur est survenue. Veuillez réessayer."
+  }
+}

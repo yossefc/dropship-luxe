@@ -1,0 +1,45 @@
+{
+  "brand": {
+    "name": "Dropship Luxe",
+    "tagline": "Premium Beauty"
+  },
+  "nav": {
+    "collections": "Collections",
+    "skincare": "Skincare",
+    "makeup": "Makeup",
+    "fragrances": "Fragrances",
+    "about": "About",
+    "contact": "Contact"
+  },
+  "cta": {
+    "shopNow": "Shop Now",
+    "learnMore": "Learn More",
+    "viewAll": "View All",
+    "viewCollection": "View Collection",
+    "subscribe": "Subscribe",
+    "addToCart": "Add to Bag",
+    "buyNow": "Buy Now",
+    "continueShopping": "Continue Shopping"
+  },
+  "badges": {
+    "new": "New",
+    "bestseller": "Bestseller",
+    "sale": "Sale",
+    "exclusive": "Exclusive",
+    "limitedEdition": "Limited Edition"
+  },
+  "footer": {
+    "rights": "All rights reserved",
+    "privacy": "Privacy Policy",
+    "terms": "Terms & Conditions",
+    "shipping": "Shipping",
+    "returns": "Returns"
+  },
+  "accessibility": {
+    "openCart": "Open shopping bag",
+    "closeCart": "Close shopping bag",
+    "menuOpen": "Open menu",
+    "menuClose": "Close menu",
+    "languageSelector": "Select language"
+  }
+}
