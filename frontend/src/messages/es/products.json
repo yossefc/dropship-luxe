@@ -1,8 +1,8 @@
 {
   "details": {
     "description": "Descripción",
-    "ingredients": "Ingredientes",
-    "howToUse": "Modo de uso",
+    "ingredients": "Composición",
+    "howToUse": "Modo de Aplicación",
     "benefits": "Beneficios",
     "reviews": "Opiniones"
   },
@@ -11,6 +11,10 @@
     "size": "Tamaño",
     "shade": "Tono",
     "quantity": "Cantidad"
+  },
+  "quantity": {
+    "decrease": "Disminuir cantidad",
+    "increase": "Aumentar cantidad"
   },
   "stock": {
     "inStock": "En stock",
@@ -23,10 +27,44 @@
     "freeShipping": "Envío gratuito",
     "expressAvailable": "Express disponible"
   },
+  "shippingReturns": {
+    "title": "Envío y Devoluciones",
+    "shippingTitle": "Envío",
+    "freeShipping": "Envío gratuito en pedidos superiores a 50€",
+    "standardDelivery": "Estándar: 3-5 días laborables",
+    "expressDelivery": "Express: 24-48 horas",
+    "returnsTitle": "Devoluciones",
+    "returnsPolicy": "Devoluciones gratuitas en 30 días. Los productos deben estar sin abrir y en su embalaje original."
+  },
+  "payment": {
+    "installments": "o 3x {amount} sin intereses con Klarna"
+  },
+  "trust": {
+    "freeShipping": "Envío gratuito",
+    "freeShippingAmount": "desde 50€",
+    "payment": "Paga en",
+    "paymentInstallments": "3 plazos sin intereses",
+    "returns": "Devoluciones gratis",
+    "returnsDays": "en 30 días",
+    "secure": "Pago",
+    "securePayment": "100% seguro"
+  },
+  "wishlist": {
+    "add": "Añadir a favoritos",
+    "remove": "Quitar de favoritos"
+  },
+  "gallery": {
+    "zoomHint": "Haz clic para ampliar",
+    "previous": "Imagen anterior",
+    "next": "Imagen siguiente",
+    "view": "Vista",
+    "close": "Cerrar"
+  },
+  "ingredientsList": "Lista INCI (Nomenclatura Internacional de Ingredientes Cosméticos)",
   "reviews": {
     "title": "Opiniones de clientes",
     "rating": "{rating} de 5",
-    "count": "{count} opiniones",
+    "count": "{count, plural, =0 {Sin opiniones} =1 {1 opinión} other {# opiniones}}",
     "writeReview": "Escribir opinión",
     "verifiedPurchase": "Compra verificada",
     "helpful": "Útil",

@@ -1,15 +1,18 @@
 {
   "title": "Votre panier",
+  "description": "Panier contenant {count, plural, =0 {aucun article} =1 {1 article} other {# articles}}",
   "empty": {
     "title": "Votre panier est vide",
     "description": "Découvrez notre sélection de produits d'exception.",
-    "cta": "Continuer mes achats"
+    "cta": "Découvrir la collection"
   },
   "item": {
     "remove": "Supprimer",
     "quantity": "Quantité",
     "unitPrice": "Prix unitaire",
-    "total": "Total"
+    "total": "Total",
+    "decreaseQuantity": "Diminuer la quantité",
+    "increaseQuantity": "Augmenter la quantité"
   },
   "summary": {
     "subtotal": "Sous-total",
@@ -20,6 +23,12 @@
     "total": "Total",
     "freeShippingProgress": "Plus que {amount} pour la livraison offerte"
   },
+  "freeShippingUnlocked": "Félicitations ! Vous bénéficiez de la livraison offerte",
+  "giftWrap": {
+    "title": "Emballage cadeau",
+    "description": "+5€ - Avec message personnalisé"
+  },
+  "secureCheckout": "Paiement sécurisé • Retours gratuits sous 30 jours",
   "actions": {
     "checkout": "Passer commande",
     "continueShopping": "Continuer mes achats",

@@ -1,8 +1,8 @@
 {
   "details": {
     "description": "Descrizione",
-    "ingredients": "Ingredienti",
-    "howToUse": "Modo d'uso",
+    "ingredients": "Composizione",
+    "howToUse": "Modalità d'Applicazione",
     "benefits": "Benefici",
     "reviews": "Recensioni"
   },
@@ -11,6 +11,10 @@
     "size": "Taglia",
     "shade": "Tonalità",
     "quantity": "Quantità"
+  },
+  "quantity": {
+    "decrease": "Diminuisci quantità",
+    "increase": "Aumenta quantità"
   },
   "stock": {
     "inStock": "Disponibile",
@@ -23,10 +27,44 @@
     "freeShipping": "Spedizione gratuita",
     "expressAvailable": "Express disponibile"
   },
+  "shippingReturns": {
+    "title": "Spedizione e Resi",
+    "shippingTitle": "Spedizione",
+    "freeShipping": "Spedizione gratuita per ordini superiori a 50€",
+    "standardDelivery": "Standard: 3-5 giorni lavorativi",
+    "expressDelivery": "Express: 24-48 ore",
+    "returnsTitle": "Resi",
+    "returnsPolicy": "Resi gratuiti entro 30 giorni. I prodotti devono essere sigillati e nella confezione originale."
+  },
+  "payment": {
+    "installments": "o 3x {amount} senza interessi con Klarna"
+  },
+  "trust": {
+    "freeShipping": "Spedizione gratuita",
+    "freeShippingAmount": "da 50€",
+    "payment": "Paga in",
+    "paymentInstallments": "3 rate senza interessi",
+    "returns": "Resi gratuiti",
+    "returnsDays": "entro 30 giorni",
+    "secure": "Pagamento",
+    "securePayment": "100% sicuro"
+  },
+  "wishlist": {
+    "add": "Aggiungi ai preferiti",
+    "remove": "Rimuovi dai preferiti"
+  },
+  "gallery": {
+    "zoomHint": "Clicca per ingrandire",
+    "previous": "Immagine precedente",
+    "next": "Immagine successiva",
+    "view": "Vista",
+    "close": "Chiudi"
+  },
+  "ingredientsList": "Lista INCI (Nomenclatura Internazionale degli Ingredienti Cosmetici)",
   "reviews": {
     "title": "Recensioni clienti",
     "rating": "{rating} su 5",
-    "count": "{count} recensioni",
+    "count": "{count, plural, =0 {Nessuna recensione} =1 {1 recensione} other {# recensioni}}",
     "writeReview": "Scrivi una recensione",
     "verifiedPurchase": "Acquisto verificato",
     "helpful": "Utile",

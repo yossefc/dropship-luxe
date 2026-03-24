@@ -12,6 +12,10 @@
     "shade": "Shade",
     "quantity": "Quantity"
   },
+  "quantity": {
+    "decrease": "Decrease quantity",
+    "increase": "Increase quantity"
+  },
   "stock": {
     "inStock": "In Stock",
     "lowStock": "Only {count} left",
@@ -23,10 +27,44 @@
     "freeShipping": "Complimentary Shipping",
     "expressAvailable": "Express Available"
   },
+  "shippingReturns": {
+    "title": "Shipping & Returns",
+    "shippingTitle": "Delivery",
+    "freeShipping": "Complimentary shipping on orders over £50",
+    "standardDelivery": "Standard: 3-5 business days",
+    "expressDelivery": "Express: 24-48 hours",
+    "returnsTitle": "Returns",
+    "returnsPolicy": "Complimentary returns within 30 days. Products must be unopened and in original packaging."
+  },
+  "payment": {
+    "installments": "or 3x {amount} interest-free with Klarna"
+  },
+  "trust": {
+    "freeShipping": "Complimentary shipping",
+    "freeShippingAmount": "over £50",
+    "payment": "Pay in",
+    "paymentInstallments": "3 interest-free instalments",
+    "returns": "Free returns",
+    "returnsDays": "within 30 days",
+    "secure": "Payment",
+    "securePayment": "100% secure"
+  },
+  "wishlist": {
+    "add": "Add to wishlist",
+    "remove": "Remove from wishlist"
+  },
+  "gallery": {
+    "zoomHint": "Click to zoom",
+    "previous": "Previous image",
+    "next": "Next image",
+    "view": "View",
+    "close": "Close"
+  },
+  "ingredientsList": "INCI List (International Nomenclature of Cosmetic Ingredients)",
   "reviews": {
     "title": "Customer Reviews",
     "rating": "{rating} out of 5",
-    "count": "{count} reviews",
+    "count": "{count, plural, =0 {No reviews} =1 {1 review} other {# reviews}}",
     "writeReview": "Write a Review",
     "verifiedPurchase": "Verified Purchase",
     "helpful": "Helpful",

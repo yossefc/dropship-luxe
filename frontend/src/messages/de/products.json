@@ -1,8 +1,8 @@
 {
   "details": {
     "description": "Beschreibung",
-    "ingredients": "Inhaltsstoffe",
-    "howToUse": "Anwendung",
+    "ingredients": "Zusammensetzung",
+    "howToUse": "Anwendungshinweise",
     "benefits": "Vorteile",
     "reviews": "Bewertungen"
   },
@@ -11,6 +11,10 @@
     "size": "Größe",
     "shade": "Farbton",
     "quantity": "Menge"
+  },
+  "quantity": {
+    "decrease": "Menge verringern",
+    "increase": "Menge erhöhen"
   },
   "stock": {
     "inStock": "Auf Lager",
@@ -23,10 +27,44 @@
     "freeShipping": "Kostenloser Versand",
     "expressAvailable": "Express verfügbar"
   },
+  "shippingReturns": {
+    "title": "Versand & Rückgabe",
+    "shippingTitle": "Versand",
+    "freeShipping": "Kostenloser Versand ab 50€ Bestellwert",
+    "standardDelivery": "Standard: 3-5 Werktage",
+    "expressDelivery": "Express: 24-48 Stunden",
+    "returnsTitle": "Rückgabe",
+    "returnsPolicy": "Kostenlose Rücksendung innerhalb von 30 Tagen. Produkte müssen ungeöffnet und in Originalverpackung sein."
+  },
+  "payment": {
+    "installments": "oder 3x {amount} zinsfrei mit Klarna"
+  },
+  "trust": {
+    "freeShipping": "Kostenloser Versand",
+    "freeShippingAmount": "ab 50€",
+    "payment": "Zahlen Sie in",
+    "paymentInstallments": "3 zinsfreien Raten",
+    "returns": "Kostenlose Rücksendung",
+    "returnsDays": "innerhalb 30 Tagen",
+    "secure": "Zahlung",
+    "securePayment": "100% sicher"
+  },
+  "wishlist": {
+    "add": "Zur Wunschliste hinzufügen",
+    "remove": "Von Wunschliste entfernen"
+  },
+  "gallery": {
+    "zoomHint": "Klicken zum Vergrößern",
+    "previous": "Vorheriges Bild",
+    "next": "Nächstes Bild",
+    "view": "Ansicht",
+    "close": "Schließen"
+  },
+  "ingredientsList": "INCI-Liste (Internationale Nomenklatur für kosmetische Inhaltsstoffe)",
   "reviews": {
     "title": "Kundenbewertungen",
     "rating": "{rating} von 5",
-    "count": "{count} Bewertungen",
+    "count": "{count, plural, =0 {Keine Bewertungen} =1 {1 Bewertung} other {# Bewertungen}}",
     "writeReview": "Bewertung schreiben",
     "verifiedPurchase": "Verifizierter Kauf",
     "helpful": "Hilfreich",

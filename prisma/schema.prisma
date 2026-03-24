@@ -47,9 +47,10 @@ model Product {
   id                  String    @id @default(uuid())
   aliexpressId        String    @unique @map("aliexpress_id")
   sku                 String    @unique
+  // Base name kept for internal reference / fallback
   name                String
-  description         String    @db.Text
-  descriptionHtml     String    @map("description_html") @db.Text
+  // Original content from supplier (before AI rewriting)
+  originalName        String    @map("original_name") @db.Text
   originalDescription String    @map("original_description") @db.Text
   category            String
   images              String[]
@@ -69,6 +70,7 @@ model Product {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
+  translations        ProductTranslation[]
   variants            ProductVariant[]
   orderItems          OrderItem[]
 
@@ -78,10 +80,53 @@ model Product {
   @@map("products")
 }
 
+// ============================================================================
+// Product Translations - Multi-language support
+// ============================================================================
+// Stores SEO-optimized, AI-generated luxury copywriting for each locale
+// ============================================================================
+
+model ProductTranslation {
+  id              String   @id @default(uuid())
+  productId       String   @map("product_id")
+  locale          String   // "fr", "en", "es", "it", "de"
+
+  // Core content - AI-rewritten luxury copywriting
+  name            String
+  slug            String   // URL-friendly, locale-specific
+  description     String   @db.Text
+  descriptionHtml String   @map("description_html") @db.Text
+
+  // Product details
+  benefits        String[] // Key benefits/selling points
+  ingredients     String?  @db.Text
+  howToUse        String?  @map("how_to_use") @db.Text
+
+  // SEO metadata - optimized for each market
+  metaTitle       String   @map("meta_title")
+  metaDescription String   @map("meta_description")
+  metaKeywords    String[] @map("meta_keywords")
+
+  // AI generation metadata
+  aiModel         String?  @map("ai_model") // e.g., "gpt-4-turbo"
+  aiPromptVersion String?  @map("ai_prompt_version") // For tracking prompt iterations
+  generatedAt     DateTime @default(now()) @map("generated_at")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, locale])
+  @@index([locale])
+  @@index([locale, slug])
+  @@map("product_translations")
+}
+
 model ProductVariant {
   id          String    @id @default(uuid())
   productId   String    @map("product_id")
-  name        String
+  name        String    // Base name (internal reference)
   sku         String    @unique
   price       Decimal   @db.Decimal(10, 2)
   currency    String    @default("EUR")
@@ -91,8 +136,77 @@ model ProductVariant {
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
   product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  translations ProductVariantTranslation[]
 
   @@map("product_variants")
+}
+
+// ============================================================================
+// Product Variant Translations
+// ============================================================================
+
+model ProductVariantTranslation {
+  id          String   @id @default(uuid())
+  variantId   String   @map("variant_id")
+  locale      String
+
+  name        String   // Translated variant name (e.g., "Rose Gold", "Or Rose")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, locale])
+  @@index([locale])
+  @@map("product_variant_translations")
+}
+
+// ============================================================================
+// Category with Translations
+// ============================================================================
+
+model Category {
+  id          String    @id @default(uuid())
+  slug        String    @unique // Internal identifier
+  parentId    String?   @map("parent_id")
+  sortOrder   Int       @default(0) @map("sort_order")
+  isActive    Boolean   @default(true) @map("is_active")
+  image       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  parent       Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children     Category[] @relation("CategoryHierarchy")
+  translations CategoryTranslation[]
+
+  @@index([parentId])
+  @@index([isActive])
+  @@map("categories")
+}
+
+model CategoryTranslation {
+  id              String   @id @default(uuid())
+  categoryId      String   @map("category_id")
+  locale          String
+
+  name            String
+  slug            String   // URL-friendly, locale-specific
+  description     String?  @db.Text
+
+  // SEO
+  metaTitle       String?  @map("meta_title")
+  metaDescription String?  @map("meta_description")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  category        Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, locale])
+  @@unique([locale, slug])
+  @@index([locale])
+  @@map("category_translations")
 }
 
 model Order {

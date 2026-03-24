@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef } from 'react';
+import { Slot } from '@radix-ui/react-slot';
 import { motion, type HTMLMotionProps } from 'framer-motion';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
@@ -67,10 +68,24 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   children: React.ReactNode;
   isLoading?: boolean;
+  asChild?: boolean;
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, rounded, fullWidth, children, isLoading, disabled, ...props }, ref) => {
+  ({ className, variant, size, rounded, fullWidth, children, isLoading, disabled, asChild = false, ...props }, ref) => {
+    // When asChild is true, render as a Slot (for Link components)
+    if (asChild) {
+      return (
+        <Slot
+          ref={ref as React.Ref<HTMLElement>}
+          className={cn(buttonVariants({ variant, size, rounded, fullWidth, className }))}
+          {...(props as React.HTMLAttributes<HTMLElement>)}
+        >
+          {children}
+        </Slot>
+      );
+    }
+
     return (
       <motion.button
         ref={ref}

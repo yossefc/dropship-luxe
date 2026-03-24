@@ -1,8 +1,8 @@
 {
   "details": {
     "description": "Description",
-    "ingredients": "Ingrédients",
-    "howToUse": "Conseils d'utilisation",
+    "ingredients": "Composition",
+    "howToUse": "Conseils d'Application",
     "benefits": "Bénéfices",
     "reviews": "Avis clients"
   },
@@ -11,6 +11,10 @@
     "size": "Taille",
     "shade": "Teinte",
     "quantity": "Quantité"
+  },
+  "quantity": {
+    "decrease": "Diminuer la quantité",
+    "increase": "Augmenter la quantité"
   },
   "stock": {
     "inStock": "En stock",
@@ -23,10 +27,44 @@
     "freeShipping": "Livraison offerte",
     "expressAvailable": "Express disponible"
   },
+  "shippingReturns": {
+    "title": "Livraison & Retours",
+    "shippingTitle": "Livraison",
+    "freeShipping": "Livraison offerte dès 50€",
+    "standardDelivery": "Standard : 3-5 jours ouvrés",
+    "expressDelivery": "Express : 24-48h",
+    "returnsTitle": "Retours",
+    "returnsPolicy": "Retours gratuits sous 30 jours. Les produits doivent être non ouverts et dans leur emballage d'origine."
+  },
+  "payment": {
+    "installments": "ou 3x {amount} sans frais avec Klarna"
+  },
+  "trust": {
+    "freeShipping": "Livraison offerte",
+    "freeShippingAmount": "dès 50€",
+    "payment": "Paiement en",
+    "paymentInstallments": "3x sans frais",
+    "returns": "Retours gratuits",
+    "returnsDays": "sous 30 jours",
+    "secure": "Paiement",
+    "securePayment": "100% sécurisé"
+  },
+  "wishlist": {
+    "add": "Ajouter aux favoris",
+    "remove": "Retirer des favoris"
+  },
+  "gallery": {
+    "zoomHint": "Cliquez pour zoomer",
+    "previous": "Image précédente",
+    "next": "Image suivante",
+    "view": "Vue",
+    "close": "Fermer"
+  },
+  "ingredientsList": "Liste INCI (International Nomenclature of Cosmetic Ingredients)",
   "reviews": {
     "title": "Avis clients",
     "rating": "{rating} sur 5",
-    "count": "{count} avis",
+    "count": "{count, plural, =0 {Aucun avis} =1 {1 avis} other {# avis}}",
     "writeReview": "Donner mon avis",
     "verifiedPurchase": "Achat vérifié",
     "helpful": "Utile",

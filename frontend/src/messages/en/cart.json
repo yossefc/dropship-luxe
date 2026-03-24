@@ -1,15 +1,18 @@
 {
   "title": "Your Bag",
+  "description": "Bag containing {count, plural, =0 {no items} =1 {1 item} other {# items}}",
   "empty": {
     "title": "Your bag is empty",
     "description": "Discover our curated selection of exceptional products.",
-    "cta": "Continue Shopping"
+    "cta": "Explore the Collection"
   },
   "item": {
     "remove": "Remove",
     "quantity": "Quantity",
     "unitPrice": "Unit Price",
-    "total": "Total"
+    "total": "Total",
+    "decreaseQuantity": "Decrease quantity",
+    "increaseQuantity": "Increase quantity"
   },
   "summary": {
     "subtotal": "Subtotal",
@@ -18,8 +21,14 @@
     "shippingCalculated": "Calculated at checkout",
     "tax": "VAT included",
     "total": "Total",
-    "freeShippingProgress": "Only {amount} away from free shipping"
+    "freeShippingProgress": "Only {amount} away from complimentary shipping"
   },
+  "freeShippingUnlocked": "Congratulations! You qualify for complimentary shipping",
+  "giftWrap": {
+    "title": "Gift Wrapping",
+    "description": "+£5 - With personalised message"
+  },
+  "secureCheckout": "Secure payment • Free returns within 30 days",
   "actions": {
     "checkout": "Proceed to Checkout",
     "continueShopping": "Continue Shopping",

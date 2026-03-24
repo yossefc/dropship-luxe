@@ -1,7 +1,7 @@
 'use client';
 
 import { useCartStore } from '@/lib/store/cart-store';
-import { CartDrawer } from './cart-drawer';
+import { CartDrawer } from './cart-drawer-i18n';
 
 interface CartProviderProps {
   children: React.ReactNode;
