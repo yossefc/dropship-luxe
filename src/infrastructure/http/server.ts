@@ -3,9 +3,12 @@ import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
+import { PrismaClient } from '@prisma/client';
 import { env } from '@infrastructure/config/env.js';
 import { Logger, AuditLogger } from '@infrastructure/config/logger.js';
 import { DomainError } from '@shared/errors/domain-error.js';
+import { createAliExpressOAuthRouter } from './controllers/aliexpress-oauth.controller.js';
 
 export interface ServerConfig {
   port: number;
@@ -14,8 +17,15 @@ export interface ServerConfig {
   rateLimitMaxRequests: number;
 }
 
-export function createServer(logger: Logger, auditLogger?: AuditLogger): Express {
+export function createServer(
+  logger: Logger,
+  auditLogger?: AuditLogger,
+  prisma?: PrismaClient
+): Express {
   const app = express();
+
+  // Cookie parser for OAuth state management
+  app.use(cookieParser());
 
   app.use(helmet({
     contentSecurityPolicy: {
@@ -113,11 +123,22 @@ export function createServer(logger: Logger, auditLogger?: AuditLogger): Express
     });
   });
 
+  // ============================================================================
+  // AliExpress OAuth Routes
+  // ============================================================================
+  // Callback URL: https://your-domain.com/api/aliexpress/callback
+  // ============================================================================
+  if (prisma) {
+    app.use('/api/aliexpress', createAliExpressOAuthRouter(prisma));
+    logger.info('AliExpress OAuth routes mounted at /api/aliexpress');
+  }
+
   return app;
 }
 
 function shouldAuditRequest(req: Request): boolean {
   return req.path.startsWith('/webhooks/stripe')
+    || req.path.startsWith('/api/aliexpress')
     || ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
 }
 
@@ -130,6 +151,10 @@ function resolveAuditActor(req: Request): string {
 
   if (req.path.startsWith('/webhooks/stripe')) {
     return 'stripe_webhook';
+  }
+
+  if (req.path.startsWith('/api/aliexpress')) {
+    return 'aliexpress_oauth';
   }
 
   return 'anonymous';

@@ -108,6 +108,7 @@ export default function HomePage(): JSX.Element {
             subtitle={t('home.hero.overline')}
             href="/collections/spring"
             span="featured"
+            priority
           />
           <BentoImageCell
             src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&h=800&fit=crop"

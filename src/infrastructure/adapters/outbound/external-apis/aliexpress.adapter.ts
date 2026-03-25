@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
+import crypto from 'crypto';
 import {
   SupplierApi,
   SupplierProduct,
@@ -35,6 +36,7 @@ export interface AliExpressConfig {
   accessToken: string;
   trackingId: string;
   baseUrl?: string;
+  getAccessToken?: () => Promise<string>;
 }
 
 interface AliExpressApiResponse<T> {
@@ -48,7 +50,20 @@ interface AliExpressApiResponse<T> {
   error_response?: {
     code: string;
     msg: string;
+    sub_code?: string;
+    sub_msg?: string;
   };
+  [key: string]: unknown;
+}
+
+interface AliExpressMerchantProfile {
+  country_code?: string;
+  product_posting_forbidden?: boolean;
+  merchant_login_id?: string;
+  shop_id?: number;
+  shop_name?: string;
+  shop_type?: string;
+  shop_url?: string;
 }
 
 export class AliExpressAdapter implements SupplierApi, AliExpressService {
@@ -68,7 +83,7 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
     });
 
     this.client = axios.create({
-      baseURL: config.baseUrl ?? 'https://api-sg.aliexpress.com/sync',
+      baseURL: config.baseUrl ?? 'https://eco.taobao.com/router/rest',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -78,20 +93,50 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
 
   private generateSignature(params: Record<string, string>): string {
     const sortedKeys = Object.keys(params).sort();
-    const signString = sortedKeys.map((key) => `${key}${params[key]}`).join('');
-    const signWithSecret = `${this.config.appSecret}${signString}${this.config.appSecret}`;
-    return CryptoService.generateHmacSha256(signWithSecret, this.config.appSecret).toUpperCase();
+    const signString = sortedKeys
+      .map((key) => `${key}${params[key]}`)
+      .join('');
+
+    return crypto
+      .createHmac('md5', this.config.appSecret)
+      .update(signString, 'utf8')
+      .digest('hex')
+      .toUpperCase();
   }
 
-  private buildRequestParams(method: string, bizParams: Record<string, unknown>): Record<string, string> {
-    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  private requiresSellerAccessToken(method: string): boolean {
+    return [
+      'aliexpress.trade.buy.placeorder',
+      'aliexpress.trade.order.get',
+      'aliexpress.logistics.tracking.query',
+      'aliexpress.trade.order.cancel',
+    ].includes(method);
+  }
+
+  private async resolveAccessToken(): Promise<string> {
+    if (this.config.getAccessToken) {
+      return this.config.getAccessToken();
+    }
+
+    if (this.config.accessToken.trim().length > 0) {
+      return this.config.accessToken;
+    }
+
+    throw new ExternalServiceError(
+      'AliExpress',
+      'Missing seller access token. Complete OAuth authorization first.'
+    );
+  }
+
+  private async buildRequestParams(method: string, bizParams: Record<string, unknown>): Promise<Record<string, string>> {
+    const timestamp = this.formatTopTimestamp(new Date());
     const params: Record<string, string> = {
       app_key: this.config.appKey,
       method,
       timestamp,
       format: 'json',
       v: '2.0',
-      sign_method: 'hmac-sha256',
+      sign_method: 'hmac',
     };
 
     for (const [key, value] of Object.entries(bizParams)) {
@@ -100,8 +145,24 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
       }
     }
 
+    if (this.requiresSellerAccessToken(method)) {
+      params['session'] = await this.resolveAccessToken();
+    }
+
     params['sign'] = this.generateSignature(params);
     return params;
+  }
+
+  private formatTopTimestamp(date: Date): string {
+    const gmtPlus8 = new Date(date.getTime() + (8 * 60 + date.getTimezoneOffset()) * 60 * 1000);
+    const year = gmtPlus8.getUTCFullYear();
+    const month = `${gmtPlus8.getUTCMonth() + 1}`.padStart(2, '0');
+    const day = `${gmtPlus8.getUTCDate()}`.padStart(2, '0');
+    const hours = `${gmtPlus8.getUTCHours()}`.padStart(2, '0');
+    const minutes = `${gmtPlus8.getUTCMinutes()}`.padStart(2, '0');
+    const seconds = `${gmtPlus8.getUTCSeconds()}`.padStart(2, '0');
+
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   }
 
   private async executeRequest<T>(
@@ -110,7 +171,7 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
   ): Promise<T> {
     return this.circuitBreaker.execute(async () => {
       return withExponentialBackoff(async () => {
-        const params = this.buildRequestParams(method, bizParams);
+        const params = await this.buildRequestParams(method, bizParams);
         const response = await this.client.post<AliExpressApiResponse<T>>(
           '',
           new URLSearchParams(params).toString()
@@ -119,21 +180,38 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
         if (response.data.error_response != null) {
           throw new ExternalServiceError(
             'AliExpress',
-            `${response.data.error_response.code}: ${response.data.error_response.msg}`
+            `${response.data.error_response.code}: ${response.data.error_response.sub_msg ?? response.data.error_response.msg}`
           );
         }
 
         const respResult = response.data.aliexpress_affiliate_product_query_response?.resp_result;
-        if (respResult == null || respResult.resp_code !== 200) {
-          throw new ExternalServiceError(
-            'AliExpress',
-            respResult?.resp_msg ?? 'Unknown error'
-          );
+        if (respResult != null) {
+          if (respResult.resp_code !== 200) {
+            throw new ExternalServiceError(
+              'AliExpress',
+              respResult.resp_msg ?? 'Unknown error'
+            );
+          }
+
+          return respResult.result as T;
         }
 
-        return respResult.result as T;
+        const responseKey = `${method.replace(/\./g, '_')}_response`;
+        const topResponse = response.data[responseKey];
+        if (topResponse != null) {
+          return topResponse as T;
+        }
+
+        throw new ExternalServiceError('AliExpress', `Unexpected response shape for method ${method}`);
       });
     });
+  }
+
+  async getMerchantProfile(): Promise<AliExpressMerchantProfile> {
+    return this.executeRequest<AliExpressMerchantProfile>(
+      'aliexpress.solution.merchant.profile.get',
+      {}
+    );
   }
 
   async searchProducts(params: SearchProductsParams): Promise<SupplierProduct[]> {

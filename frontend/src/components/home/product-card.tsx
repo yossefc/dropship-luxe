@@ -56,7 +56,7 @@ export function ProductCard({
     >
       {/* Image Container */}
       <Link href={`/products/${product.slug}`} className="relative block">
-        <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-neutral-100">
+        <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-neutral-100" style={{ position: 'relative' }}>
           {/* Main Image */}
           <Image
             src={product.image}

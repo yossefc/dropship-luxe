@@ -119,6 +119,12 @@ export function createLogger(config: LoggerConfig): Logger {
   return new WinstonLogger(config);
 }
 
+export const logger: Logger = createLogger({
+  level: process.env['LOG_LEVEL'] ?? 'info',
+  logsDir: process.env['LOGS_DIR'] ?? './logs',
+  retentionDays: Number(process.env['LOG_RETENTION_DAYS'] ?? '365'),
+});
+
 export class AuditLogger {
   private readonly logger: Logger;
   private readonly fallbackLogger: Logger;

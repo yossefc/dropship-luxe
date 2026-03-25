@@ -7,8 +7,12 @@ import { CronScheduler } from '@infrastructure/cron/scheduler.js';
 import { BullMQAdapter } from '@infrastructure/messaging/bullmq.adapter.js';
 import { StripeAdapter } from '@infrastructure/adapters/outbound/external-apis/stripe.adapter.js';
 import { AliExpressAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
+import { createAliExpressOAuthService } from '@infrastructure/adapters/outbound/external-apis/aliexpress-oauth.service.js';
 import { OpenAIAdapter } from '@infrastructure/adapters/outbound/external-apis/openai.adapter.js';
 import { createStripeWebhookRouter } from '@infrastructure/adapters/inbound/webhooks/stripe.webhook.js';
+import { createHypAdapter } from '@infrastructure/adapters/outbound/payment/hyp.adapter.js';
+import { createHypWebhookRouter } from '@infrastructure/http/controllers/hyp-webhook.controller.js';
+import Redis from 'ioredis';
 
 async function bootstrap(): Promise<void> {
   const logger = createLogger({
@@ -18,6 +22,7 @@ async function bootstrap(): Promise<void> {
   });
 
   const auditLogger = new AuditLogger(logger, new PrismaAuditLogWriter(prisma));
+  const aliexpressOAuthService = createAliExpressOAuthService(prisma);
 
   logger.info('Starting Dropship Luxe API', {
     environment: env.NODE_ENV,
@@ -43,13 +48,14 @@ async function bootstrap(): Promise<void> {
     appSecret: env.ALIEXPRESS_APP_SECRET,
     accessToken: env.ALIEXPRESS_ACCESS_TOKEN,
     trackingId: env.ALIEXPRESS_TRACKING_ID,
+    getAccessToken: async () => aliexpressOAuthService.getValidAccessToken(),
   });
 
   const openaiAdapter = new OpenAIAdapter({
     apiKey: env.OPENAI_API_KEY,
   });
 
-  const app = createServer(logger, auditLogger);
+  const app = createServer(logger, auditLogger, prisma);
 
   const stripeWebhookRouter = createStripeWebhookRouter({
     paymentGateway: stripeAdapter,
@@ -60,6 +66,35 @@ async function bootstrap(): Promise<void> {
   });
 
   app.use('/webhooks', stripeWebhookRouter);
+
+  // ============================================================================
+  // Hyp (YaadPay) Payment Gateway Integration
+  // ============================================================================
+  try {
+    const hypAdapter = createHypAdapter(logger);
+    const redisConnection = new Redis({
+      host: env.REDIS_HOST,
+      port: env.REDIS_PORT,
+      password: env.REDIS_PASSWORD,
+      tls: env.REDIS_HOST.includes('upstash') ? {} : undefined,
+      maxRetriesPerRequest: null,
+    });
+
+    const { router: hypWebhookRouter } = createHypWebhookRouter(
+      hypAdapter,
+      prisma,
+      redisConnection,
+      logger,
+      auditLogger
+    );
+
+    app.use('/webhooks/hyp', hypWebhookRouter);
+    logger.info('Hyp webhook routes mounted at /webhooks/hyp');
+  } catch (error) {
+    logger.warn('Hyp payment gateway not configured, skipping...', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 
   app.get('/api/v1/products', async (_req, res) => {
     res.json({

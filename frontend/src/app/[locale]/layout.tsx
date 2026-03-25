@@ -1,35 +1,9 @@
 import type { Metadata } from 'next';
-import { Inter, Playfair_Display, Cormorant, Montserrat } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { locales, type Locale, localeSeoConfig } from '@/i18n/config';
-import '@/styles/globals.css';
 import { CartProvider } from '@/components/cart/cart-provider';
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-});
-
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
-  display: 'swap',
-});
-
-const cormorant = Cormorant({
-  subsets: ['latin'],
-  variable: '--font-cormorant',
-  display: 'swap',
-});
-
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  variable: '--font-montserrat',
-  display: 'swap',
-});
 
 // Generate static params for all locales
 export function generateStaticParams() {
@@ -113,17 +87,10 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html
-      lang={locale}
-      className={`${inter.variable} ${playfair.variable} ${cormorant.variable} ${montserrat.variable}`}
-    >
-      <body className="font-body bg-neutral-50 text-primary-800 antialiased">
-        <NextIntlClientProvider messages={messages}>
-          <CartProvider>
-            {children}
-          </CartProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider messages={messages}>
+      <CartProvider>
+        {children}
+      </CartProvider>
+    </NextIntlClientProvider>
   );
 }

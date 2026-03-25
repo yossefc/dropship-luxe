@@ -283,13 +283,15 @@ model Order {
   shippedAt             DateTime?     @map("shipped_at")
   deliveredAt           DateTime?     @map("delivered_at")
 
-  customer              Customer      @relation(fields: [customerId], references: [id])
+  customer              Customer        @relation(fields: [customerId], references: [id])
   items                 OrderItem[]
+  supplierOrders        SupplierOrder[]
 
   @@index([status])
   @@index([paymentStatus])
   @@index([customerId])
   @@index([createdAt])
+  @@index([stripePaymentIntentId])
   @@map("orders")
 }
 
@@ -418,4 +420,140 @@ enum QuarantineStatus {
   approved
   rejected
   needs_review
+}
+
+// ============================================================================
+// Webhook Events - Idempotent Processing & Audit Trail
+// ============================================================================
+
+model WebhookEvent {
+  id              String        @id @default(uuid())
+  stripeEventId   String        @unique @map("stripe_event_id")
+  eventType       String?       @map("event_type")
+  status          WebhookStatus @default(processing)
+  payload         Json?
+  errorMessage    String?       @map("error_message") @db.Text
+  processedAt     DateTime?     @map("processed_at")
+  receivedAt      DateTime      @default(now()) @map("received_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([stripeEventId])
+  @@index([status])
+  @@index([receivedAt])
+  @@map("webhook_events")
+}
+
+enum WebhookStatus {
+  processing
+  completed
+  failed
+  ignored
+}
+
+// ============================================================================
+// Supplier Orders - AliExpress Order Tracking
+// ============================================================================
+
+model SupplierOrder {
+  id                  String              @id @default(uuid())
+  orderId             String              @map("order_id")
+  aliexpressOrderId   String?             @unique @map("aliexpress_order_id")
+
+  // Order details
+  productId           String              @map("product_id")
+  variantId           String?             @map("variant_id")
+  quantity            Int
+  unitCost            Decimal             @map("unit_cost") @db.Decimal(10, 2)
+  shippingCost        Decimal             @map("shipping_cost") @db.Decimal(10, 2)
+  totalCost           Decimal             @map("total_cost") @db.Decimal(10, 2)
+  currency            String              @default("EUR")
+
+  // Shipping address (sanitized for AliExpress)
+  shippingName        String              @map("shipping_name")
+  shippingAddress     String              @map("shipping_address")
+  shippingCity        String              @map("shipping_city")
+  shippingPostalCode  String              @map("shipping_postal_code")
+  shippingCountry     String              @map("shipping_country")
+  shippingPhone       String?             @map("shipping_phone")
+  taxId               String?             @map("tax_id") // CPF (Brazil) or RUT (Chile)
+
+  // Status tracking
+  status              SupplierOrderStatus @default(pending)
+  trackingNumber      String?             @map("tracking_number")
+  trackingUrl         String?             @map("tracking_url")
+  carrier             String?
+
+  // Error handling
+  lastError           String?             @map("last_error") @db.Text
+  retryCount          Int                 @default(0) @map("retry_count")
+
+  // Timestamps
+  submittedAt         DateTime?           @map("submitted_at")
+  shippedAt           DateTime?           @map("shipped_at")
+  deliveredAt         DateTime?           @map("delivered_at")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+
+  order               Order               @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+  @@index([aliexpressOrderId])
+  @@index([trackingNumber])
+  @@map("supplier_orders")
+}
+
+enum SupplierOrderStatus {
+  pending           // Awaiting submission to AliExpress
+  submitted         // Sent to AliExpress
+  confirmed         // AliExpress confirmed receipt
+  processing        // Being prepared by supplier
+  shipped           // Dispatched with tracking
+  in_transit        // In delivery
+  delivered         // Confirmed delivery
+  failed            // Submission failed
+  cancelled         // Order cancelled
+}
+
+// ============================================================================
+// AliExpress OAuth Credentials - Secure Token Storage
+// ============================================================================
+// Stores encrypted access tokens for AliExpress Open Platform API
+// Tokens are AES-256 encrypted at rest
+// ============================================================================
+
+model AliExpressCredential {
+  id                    String    @id @default(uuid())
+
+  // Identifier for this credential set (e.g., "primary", "backup")
+  name                  String    @unique @default("primary")
+
+  // Encrypted tokens (AES-256)
+  accessTokenEncrypted  String    @map("access_token_encrypted") @db.Text
+  refreshTokenEncrypted String?   @map("refresh_token_encrypted") @db.Text
+
+  // Token metadata
+  tokenType             String    @default("Bearer") @map("token_type")
+  expiresAt             DateTime? @map("expires_at")
+  refreshExpiresAt      DateTime? @map("refresh_expires_at")
+  scope                 String?   // Granted permissions
+
+  // AliExpress account info
+  aliexpressUserId      String?   @map("aliexpress_user_id")
+  aliexpressUserNick    String?   @map("aliexpress_user_nick")
+  sellerAccountId       String?   @map("seller_account_id")
+
+  // Status tracking
+  isActive              Boolean   @default(true) @map("is_active")
+  lastUsedAt            DateTime? @map("last_used_at")
+  lastRefreshedAt       DateTime? @map("last_refreshed_at")
+  lastError             String?   @map("last_error") @db.Text
+
+  // Audit
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([expiresAt])
+  @@map("aliexpress_credentials")
 }

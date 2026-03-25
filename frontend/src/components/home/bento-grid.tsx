@@ -128,6 +128,7 @@ interface BentoImageCellProps {
   span?: 'default' | 'wide' | 'tall' | 'featured';
   overlay?: 'none' | 'subtle' | 'gradient';
   className?: string;
+  priority?: boolean;
 }
 
 export function BentoImageCell({
@@ -139,6 +140,7 @@ export function BentoImageCell({
   span = 'default',
   overlay = 'gradient',
   className,
+  priority = false,
 }: BentoImageCellProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: '-50px' });
@@ -171,13 +173,14 @@ export function BentoImageCell({
       )}
     >
       {/* Image */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" style={{ position: 'absolute' }}>
         <Image
           src={src}
           alt={alt}
           fill
           className="object-cover transition-transform duration-700 ease-luxury group-hover:scale-105"
           sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          priority={priority}
         />
       </div>
 

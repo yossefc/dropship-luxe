@@ -124,6 +124,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps): JS
                 ? 'border-accent-gold opacity-100 shadow-md'
                 : 'border-transparent opacity-60 hover:opacity-100'
             )}
+            style={{ position: 'relative' }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.98 }}
             aria-label={`${productName} - ${t('gallery.view')} ${index + 1}`}
@@ -156,6 +157,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps): JS
               exit={{ scale: 0.9, opacity: 0 }}
               transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
               className="absolute inset-8 lg:inset-16"
+              style={{ position: 'absolute' }}
             >
               <Image
                 src={currentImage.src}
@@ -227,6 +229,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps): JS
                       ? 'ring-2 ring-accent-gold'
                       : 'opacity-60 hover:opacity-100'
                   )}
+                  style={{ position: 'relative' }}
                 >
                   <Image
                     src={image.src}
