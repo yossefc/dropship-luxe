@@ -53,6 +53,7 @@ const envSchema = z.object({
   ENCRYPTION_KEY: z.string().length(64),           // 256-bit AES key (64 hex chars)
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('24h'),
+  ADMIN_PASSWORD: z.string().min(8).optional(),
 
   // ============================================================================
   // CORS & Rate Limiting

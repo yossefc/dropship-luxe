@@ -21,7 +21,10 @@
       "WebFetch(domain:4each.com.br)",
       "WebFetch(domain:developers.aliexpress.com)",
       "WebFetch(domain:developer.alibaba.com)",
-      "WebFetch(domain:www.aliexpress.com)"
+      "WebFetch(domain:www.aliexpress.com)",
+      "Bash(more:*)",
+      "Bash(timeout:*)",
+      "Bash(dir \"D:\\\\dropship-luxe\\\\frontend\\\\.env*\")"
     ]
   }
 }

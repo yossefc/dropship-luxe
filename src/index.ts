@@ -1,3 +1,21 @@
+// ============================================================================
+// Dropship Luxe API - Main Entry Point
+// ============================================================================
+// Point d'entrée principal du serveur Dropship Luxe.
+//
+// Ce fichier initialise:
+// - Le serveur Express avec toutes les routes (Webhooks Hyp, OAuth AliExpress, Admin)
+// - Les files d'attente BullMQ et leurs Workers
+// - Le scheduler de tâches Cron (sync stocks toutes les 6h)
+// - La connexion Prisma/PostgreSQL
+// - La connexion Redis
+//
+// IMPORTANT: Stripe a été complètement supprimé.
+// Tous les paiements passent par Hyp (YaadPay).
+// ============================================================================
+
+import Redis from 'ioredis';
+import { Worker } from 'bullmq';
 import { env } from '@infrastructure/config/env.js';
 import { createLogger, AuditLogger } from '@infrastructure/config/logger.js';
 import { PrismaAuditLogWriter } from '@infrastructure/audit/prisma-audit-log-writer.js';
@@ -5,16 +23,40 @@ import { prisma } from '@infrastructure/config/prisma.js';
 import { createServer, setupErrorHandling } from '@infrastructure/http/server.js';
 import { CronScheduler } from '@infrastructure/cron/scheduler.js';
 import { BullMQAdapter } from '@infrastructure/messaging/bullmq.adapter.js';
-import { StripeAdapter } from '@infrastructure/adapters/outbound/external-apis/stripe.adapter.js';
-import { AliExpressAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
-import { createAliExpressOAuthService } from '@infrastructure/adapters/outbound/external-apis/aliexpress-oauth.service.js';
-import { OpenAIAdapter } from '@infrastructure/adapters/outbound/external-apis/openai.adapter.js';
-import { createStripeWebhookRouter } from '@infrastructure/adapters/inbound/webhooks/stripe.webhook.js';
+
+// Adapters - Hyp remplace Stripe
 import { createHypAdapter } from '@infrastructure/adapters/outbound/payment/hyp.adapter.js';
-import { createHypWebhookRouter } from '@infrastructure/http/controllers/hyp-webhook.controller.js';
-import Redis from 'ioredis';
+import { AliExpressAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
+import { OpenAIAdapter } from '@infrastructure/adapters/outbound/external-apis/openai.adapter.js';
+import { createAliExpressOAuthService } from '@infrastructure/adapters/outbound/external-apis/aliexpress-oauth.service.js';
+
+// Controllers & Routers
+import { createHypWebhookRouter, PaymentProcessingJob } from '@infrastructure/http/controllers/hyp-webhook.controller.js';
+import { createAliExpressOAuthRouter } from '@infrastructure/http/controllers/aliexpress-oauth.controller.js';
+
+// Jobs & Workers
+import { createTrackingSyncJob } from '@infrastructure/jobs/tracking-sync.job.js';
+import { createProductImportJob, ImportJobResult } from '@infrastructure/jobs/product-import.job.js';
+
+// ============================================================================
+// Types
+// ============================================================================
+
+interface AdminSettings {
+  priceMultiplier: number;
+  minProductScore: number;
+  quarantineThreshold: number;
+  autoImportEnabled: boolean;
+}
+
+// ============================================================================
+// Main Bootstrap Function
+// ============================================================================
 
 async function bootstrap(): Promise<void> {
+  // ==========================================================================
+  // 1. Initialize Logger
+  // ==========================================================================
   const logger = createLogger({
     level: env.LOG_LEVEL,
     logsDir: env.LOGS_DIR,
@@ -22,13 +64,38 @@ async function bootstrap(): Promise<void> {
   });
 
   const auditLogger = new AuditLogger(logger, new PrismaAuditLogWriter(prisma));
-  const aliexpressOAuthService = createAliExpressOAuthService(prisma);
 
-  logger.info('Starting Dropship Luxe API', {
+  logger.info('========================================');
+  logger.info('Starting Dropship Luxe API');
+  logger.info('========================================');
+  logger.info('Configuration:', {
     environment: env.NODE_ENV,
     port: env.PORT,
+    paymentGateway: 'Hyp (YaadPay)',
   });
 
+  // ==========================================================================
+  // 2. Initialize Redis Connection
+  // ==========================================================================
+  const redisConnection = new Redis({
+    host: env.REDIS_HOST,
+    port: env.REDIS_PORT,
+    password: env.REDIS_PASSWORD ?? undefined,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+  });
+
+  redisConnection.on('connect', () => {
+    logger.info('Redis connected', { host: env.REDIS_HOST, port: env.REDIS_PORT });
+  });
+
+  redisConnection.on('error', (error) => {
+    logger.error('Redis connection error', { error: error.message });
+  });
+
+  // ==========================================================================
+  // 3. Initialize Message Queue (BullMQ)
+  // ==========================================================================
   const messageQueue = new BullMQAdapter(
     {
       redisHost: env.REDIS_HOST,
@@ -38,11 +105,20 @@ async function bootstrap(): Promise<void> {
     logger
   );
 
-  const stripeAdapter = new StripeAdapter({
-    secretKey: env.STRIPE_SECRET_KEY,
-    webhookSecret: env.STRIPE_WEBHOOK_SECRET,
-  });
+  logger.info('BullMQ message queue initialized');
 
+  // ==========================================================================
+  // 4. Initialize Adapters (Hyp, AliExpress, OpenAI)
+  // ==========================================================================
+
+  // HYP ADAPTER - Remplace complètement Stripe
+  const hypAdapter = createHypAdapter(logger);
+  logger.info('Hyp (YaadPay) payment adapter initialized');
+
+  // AliExpress OAuth Service
+  const aliexpressOAuthService = createAliExpressOAuthService(prisma);
+
+  // AliExpress Adapter
   const aliexpressAdapter = new AliExpressAdapter({
     appKey: env.ALIEXPRESS_APP_KEY,
     appSecret: env.ALIEXPRESS_APP_SECRET,
@@ -50,91 +126,763 @@ async function bootstrap(): Promise<void> {
     trackingId: env.ALIEXPRESS_TRACKING_ID,
     getAccessToken: async () => aliexpressOAuthService.getValidAccessToken(),
   });
+  logger.info('AliExpress adapter initialized');
 
+  // OpenAI Adapter
   const openaiAdapter = new OpenAIAdapter({
     apiKey: env.OPENAI_API_KEY,
   });
+  logger.info('OpenAI adapter initialized');
 
+  // ==========================================================================
+  // 5. Create Express Server
+  // ==========================================================================
   const app = createServer(logger, auditLogger, prisma);
 
-  const stripeWebhookRouter = createStripeWebhookRouter({
-    paymentGateway: stripeAdapter,
-    orderRepository: null as never,
-    messageQueue,
+  // ==========================================================================
+  // 6. Mount Hyp Webhook Routes (CRITICAL - Payment Processing)
+  // ==========================================================================
+  const { router: hypWebhookRouter, controller: hypWebhookController } = createHypWebhookRouter(
+    hypAdapter,
+    prisma,
+    redisConnection,
     logger,
-    auditLogger,
-  });
+    auditLogger
+  );
 
-  app.use('/webhooks', stripeWebhookRouter);
+  app.use('/webhooks/hyp', hypWebhookRouter);
+  logger.info('Hyp webhook routes mounted at /webhooks/hyp');
 
-  // ============================================================================
-  // Hyp (YaadPay) Payment Gateway Integration
-  // ============================================================================
-  try {
-    const hypAdapter = createHypAdapter(logger);
-    const redisConnection = new Redis({
-      host: env.REDIS_HOST,
-      port: env.REDIS_PORT,
-      password: env.REDIS_PASSWORD,
-      tls: env.REDIS_HOST.includes('upstash') ? {} : undefined,
-      maxRetriesPerRequest: null,
-    });
+  // ==========================================================================
+  // 7. Mount AliExpress OAuth Routes
+  // ==========================================================================
+  app.use('/api/aliexpress', createAliExpressOAuthRouter(prisma));
+  logger.info('AliExpress OAuth routes mounted at /api/aliexpress');
 
-    const { router: hypWebhookRouter } = createHypWebhookRouter(
-      hypAdapter,
-      prisma,
-      redisConnection,
-      logger,
-      auditLogger
-    );
-
-    app.use('/webhooks/hyp', hypWebhookRouter);
-    logger.info('Hyp webhook routes mounted at /webhooks/hyp');
-  } catch (error) {
-    logger.warn('Hyp payment gateway not configured, skipping...', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
-
+  // ==========================================================================
+  // 8. Mount API Routes
+  // ==========================================================================
   app.get('/api/v1/products', async (_req, res) => {
-    res.json({
-      success: true,
-      data: [],
-      message: 'Products endpoint - connect repository',
+    try {
+      const products = await prisma.product.findMany({
+        where: { isActive: true },
+        include: {
+          translations: {
+            where: { locale: 'fr' },
+          },
+          variants: {
+            where: { isActive: true },
+          },
+        },
+        take: 50,
+        orderBy: { createdAt: 'desc' },
+      });
+
+      res.json({
+        success: true,
+        data: products,
+        count: products.length,
+      });
+    } catch (error) {
+      logger.error('Failed to fetch products', { error });
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch products',
+      });
+    }
+  });
+
+  // Health check with dependency status
+  app.get('/api/health/detailed', async (_req, res) => {
+    const checks = {
+      database: false,
+      redis: false,
+      timestamp: new Date().toISOString(),
+    };
+
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      checks.database = true;
+    } catch {
+      // Database check failed
+    }
+
+    try {
+      await redisConnection.ping();
+      checks.redis = true;
+    } catch {
+      // Redis check failed
+    }
+
+    const allHealthy = checks.database && checks.redis;
+    res.status(allHealthy ? 200 : 503).json({
+      status: allHealthy ? 'healthy' : 'degraded',
+      checks,
     });
   });
 
+  // ==========================================================================
+  // 9. Admin API Routes (Protected)
+  // ==========================================================================
+
+  // Simple admin auth middleware
+  const adminAuth = (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    const adminPassword = process.env.ADMIN_PASSWORD ?? 'dropship-luxe-admin-2024';
+
+    if (!authHeader || authHeader !== `Bearer ${adminPassword}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+  };
+
+  // Initialize product import job
+  const productImportJob = createProductImportJob(prisma);
+  let lastImportResult: ImportJobResult | null = null;
+
+  // Admin Settings
+  let adminSettings: AdminSettings = {
+    priceMultiplier: 2.5,
+    minProductScore: 65,
+    quarantineThreshold: 50,
+    autoImportEnabled: false,
+  };
+
+  // GET /api/admin/health
+  app.get('/api/admin/health', adminAuth, async (_req, res) => {
+    const health: Record<string, any> = {
+      database: { status: 'unhealthy' },
+      redis: { status: 'unhealthy' },
+      aliexpress: { status: 'unknown' },
+      openai: { status: 'unknown' },
+      hyp: { status: 'configured', masof: env.HYP_MASOF?.substring(0, 4) + '****' },
+    };
+
+    try {
+      const start = Date.now();
+      await prisma.$queryRaw`SELECT 1`;
+      health.database = { status: 'healthy', latencyMs: Date.now() - start };
+    } catch {
+      health.database = { status: 'unhealthy' };
+    }
+
+    try {
+      const start = Date.now();
+      await redisConnection.ping();
+      health.redis = { status: 'healthy', latencyMs: Date.now() - start };
+    } catch {
+      health.redis = { status: 'unhealthy' };
+    }
+
+    try {
+      const credential = await prisma.aliExpressCredential.findFirst({
+        where: { isActive: true },
+      });
+      if (credential && credential.expiresAt && credential.expiresAt > new Date()) {
+        health.aliexpress = { status: 'healthy', lastCheck: credential.lastUsedAt?.toISOString() };
+      } else {
+        health.aliexpress = { status: 'unhealthy', lastCheck: credential?.lastUsedAt?.toISOString() };
+      }
+    } catch {
+      health.aliexpress = { status: 'unknown' };
+    }
+
+    health.openai = {
+      status: env.OPENAI_API_KEY?.startsWith('sk-') ? 'healthy' : 'unhealthy',
+      lastCheck: new Date().toISOString(),
+    };
+
+    res.json(health);
+  });
+
+  // GET /api/admin/imports
+  app.get('/api/admin/imports', adminAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const imports = await prisma.importHistory.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+
+      res.json({
+        imports,
+        lastResult: lastImportResult,
+      });
+    } catch (error) {
+      logger.error('Failed to fetch import history', { error });
+      res.status(500).json({ error: 'Failed to fetch imports' });
+    }
+  });
+
+  // POST /api/admin/imports/run
+  app.post('/api/admin/imports/run', adminAuth, async (req, res) => {
+    try {
+      const { feedName, maxProducts, dryRun } = req.body;
+
+      logger.info('Manual import triggered', { feedName, maxProducts, dryRun });
+
+      res.json({ status: 'started', message: 'Import job started' });
+
+      lastImportResult = await productImportJob.execute({
+        feedName: feedName ?? 'DS_France_topsellers',
+        maxProducts: maxProducts ?? 20,
+        minScore: adminSettings.minProductScore,
+        quarantineThreshold: adminSettings.quarantineThreshold,
+        priceMultiplier: adminSettings.priceMultiplier,
+        dryRun: dryRun ?? false,
+      });
+
+      logger.info('Manual import completed', { result: lastImportResult });
+    } catch (error) {
+      logger.error('Manual import failed', { error });
+    }
+  });
+
+  // GET /api/admin/quarantine
+  app.get('/api/admin/quarantine', adminAuth, async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const quarantined = await prisma.productQuarantine.findMany({
+        where: status ? { status: status as any } : undefined,
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+
+      res.json({ products: quarantined });
+    } catch (error) {
+      logger.error('Failed to fetch quarantine', { error });
+      res.status(500).json({ error: 'Failed to fetch quarantine' });
+    }
+  });
+
+  // GET /api/admin/orders
+  app.get('/api/admin/orders', adminAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const orders = await prisma.order.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: {
+          items: true,
+          supplierOrders: true,
+        },
+      });
+
+      const formattedOrders = orders.map(order => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerEmail: order.customerEmail,
+        total: order.total,
+        currency: order.currency,
+        paymentStatus: order.paymentStatus,
+        orderStatus: order.status,
+        supplierStatus: order.supplierOrders.length > 0
+          ? order.supplierOrders.every(s => s.status === 'delivered')
+            ? 'delivered'
+            : order.supplierOrders.some(s => s.status === 'shipped')
+            ? 'shipped'
+            : order.supplierOrders.some(s => s.status === 'submitted')
+            ? 'processing'
+            : 'pending'
+          : 'none',
+        trackingNumbers: order.supplierOrders
+          .filter(s => s.trackingNumber)
+          .map(s => s.trackingNumber),
+        createdAt: order.createdAt,
+        paidAt: order.paidAt,
+      }));
+
+      res.json({ orders: formattedOrders });
+    } catch (error) {
+      logger.error('Failed to fetch orders', { error });
+      res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+  });
+
+  // GET /api/admin/settings
+  app.get('/api/admin/settings', adminAuth, (_req, res) => {
+    res.json(adminSettings);
+  });
+
+  // PUT /api/admin/settings
+  app.put('/api/admin/settings', adminAuth, async (req, res) => {
+    try {
+      const { priceMultiplier, minProductScore, quarantineThreshold, autoImportEnabled } = req.body;
+
+      if (priceMultiplier !== undefined) adminSettings.priceMultiplier = parseFloat(priceMultiplier);
+      if (minProductScore !== undefined) adminSettings.minProductScore = parseInt(minProductScore);
+      if (quarantineThreshold !== undefined) adminSettings.quarantineThreshold = parseInt(quarantineThreshold);
+      if (autoImportEnabled !== undefined) adminSettings.autoImportEnabled = Boolean(autoImportEnabled);
+
+      logger.info('Admin settings updated', adminSettings);
+
+      res.json(adminSettings);
+    } catch (error) {
+      logger.error('Failed to update settings', { error });
+      res.status(500).json({ error: 'Failed to update settings' });
+    }
+  });
+
+  // POST /api/admin/prices/recalculate
+  app.post('/api/admin/prices/recalculate', adminAuth, async (req, res) => {
+    try {
+      const { multiplier } = req.body;
+      const priceMultiplier = parseFloat(multiplier ?? adminSettings.priceMultiplier);
+
+      const products = await prisma.product.findMany({
+        where: { isActive: true },
+        select: { id: true, costPrice: true },
+      });
+
+      let updated = 0;
+      for (const product of products) {
+        const newPrice = product.costPrice.toNumber() * priceMultiplier;
+        await prisma.product.update({
+          where: { id: product.id },
+          data: { sellingPrice: newPrice },
+        });
+        updated++;
+      }
+
+      adminSettings.priceMultiplier = priceMultiplier;
+
+      logger.info('Prices recalculated', { multiplier: priceMultiplier, updated });
+
+      res.json({ success: true, updated, multiplier: priceMultiplier });
+    } catch (error) {
+      logger.error('Price recalculation failed', { error });
+      res.status(500).json({ error: 'Price recalculation failed' });
+    }
+  });
+
+  // GET /api/admin/stats
+  app.get('/api/admin/stats', adminAuth, async (_req, res) => {
+    try {
+      const [
+        totalProducts,
+        activeProducts,
+        quarantinedCount,
+        totalOrders,
+        pendingOrders,
+        recentRevenue,
+      ] = await Promise.all([
+        prisma.product.count(),
+        prisma.product.count({ where: { isActive: true } }),
+        prisma.productQuarantine.count({ where: { status: 'pending' } }),
+        prisma.order.count(),
+        prisma.order.count({ where: { status: 'pending' } }),
+        prisma.order.aggregate({
+          where: {
+            paymentStatus: 'succeeded',
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+          },
+          _sum: { total: true },
+        }),
+      ]);
+
+      res.json({
+        products: {
+          total: totalProducts,
+          active: activeProducts,
+          quarantined: quarantinedCount,
+        },
+        orders: {
+          total: totalOrders,
+          pending: pendingOrders,
+        },
+        revenue: {
+          last30Days: recentRevenue._sum.total ?? 0,
+        },
+        settings: adminSettings,
+      });
+    } catch (error) {
+      logger.error('Failed to fetch stats', { error });
+      res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+  });
+
+  logger.info('Admin API routes mounted at /api/admin/*');
+
+  // ==========================================================================
+  // 10. Setup Error Handling
+  // ==========================================================================
   setupErrorHandling(app, logger);
 
+  // ==========================================================================
+  // 11. Initialize Workers (BullMQ)
+  // ==========================================================================
+
+  // Worker pour traiter les paiements Hyp
+  const hypPaymentWorker = new Worker<PaymentProcessingJob>(
+    'hyp-payments',
+    async (job) => {
+      const { eventType } = job.data;
+
+      logger.info('Processing Hyp payment job', {
+        jobId: job.id,
+        eventType,
+        orderId: job.data.orderId,
+      });
+
+      switch (eventType) {
+        case 'payment.succeeded':
+          await hypWebhookController.processSuccessfulPayment(job.data);
+          break;
+
+        case 'payment.failed':
+        case 'payment.canceled':
+          await hypWebhookController.processFailedPayment(job.data);
+          break;
+
+        default:
+          logger.warn('Unhandled payment event type', { eventType });
+      }
+
+      return { processed: true, eventType };
+    },
+    {
+      connection: redisConnection,
+      concurrency: 5,
+    }
+  );
+
+  hypPaymentWorker.on('completed', (job, result) => {
+    logger.info('Hyp payment job completed', {
+      jobId: job.id,
+      eventType: job.data.eventType,
+      result,
+    });
+  });
+
+  hypPaymentWorker.on('failed', (job, error) => {
+    logger.error('Hyp payment job failed', {
+      jobId: job?.id,
+      eventType: job?.data.eventType,
+      error: error.message,
+    });
+  });
+
+  logger.info('Hyp payment worker started');
+
+  // Worker pour le fulfillment AliExpress
+  const fulfillmentWorker = new Worker(
+    'order-fulfillment',
+    async (job) => {
+      const { orderId } = job.data;
+
+      logger.info('Processing AliExpress fulfillment', { orderId });
+
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          items: {
+            include: {
+              product: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        throw new Error(`Order not found: ${orderId}`);
+      }
+
+      for (const item of order.items) {
+        try {
+          const sanitizedAddress = {
+            fullName: `${order.shippingFirstName} ${order.shippingLastName}`
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toUpperCase(),
+            street: order.shippingStreet
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toUpperCase(),
+            city: order.shippingCity
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toUpperCase(),
+            postalCode: order.shippingPostalCode.replace(/\s/g, ''),
+            country: order.shippingCountry.toUpperCase(),
+            phone: order.shippingPhone ?? '',
+          };
+
+          const supplierOrder = await prisma.supplierOrder.create({
+            data: {
+              orderId: order.id,
+              productId: item.productId,
+              variantId: item.variantId,
+              quantity: item.quantity,
+              unitCost: item.supplierPrice,
+              shippingCost: 0,
+              totalCost: item.supplierPrice.toNumber() * item.quantity,
+              shippingName: sanitizedAddress.fullName,
+              shippingAddress: sanitizedAddress.street,
+              shippingCity: sanitizedAddress.city,
+              shippingPostalCode: sanitizedAddress.postalCode,
+              shippingCountry: sanitizedAddress.country,
+              shippingPhone: sanitizedAddress.phone,
+              status: 'pending',
+            },
+          });
+
+          const result = await aliexpressAdapter.placeOrder(
+            [
+              {
+                productId: item.product.aliexpressId,
+                variantId: item.variantId ?? undefined,
+                quantity: item.quantity,
+              },
+            ],
+            sanitizedAddress
+          );
+
+          await prisma.supplierOrder.update({
+            where: { id: supplierOrder.id },
+            data: {
+              aliexpressOrderId: result.orderId,
+              status: 'submitted',
+              submittedAt: new Date(),
+            },
+          });
+
+          logger.info('AliExpress order created', {
+            supplierOrderId: supplierOrder.id,
+            aliexpressOrderId: result.orderId,
+          });
+
+        } catch (error) {
+          logger.error('Failed to create AliExpress order', {
+            orderId,
+            itemId: item.id,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      await prisma.order.update({
+        where: { id: orderId },
+        data: { status: 'processing' },
+      });
+
+      return { processed: true, orderId };
+    },
+    {
+      connection: redisConnection,
+      concurrency: 3,
+    }
+  );
+
+  fulfillmentWorker.on('completed', (job, result) => {
+    logger.info('Fulfillment job completed', { jobId: job.id, result });
+  });
+
+  fulfillmentWorker.on('failed', (job, error) => {
+    logger.error('Fulfillment job failed', {
+      jobId: job?.id,
+      error: error.message,
+    });
+  });
+
+  logger.info('Order fulfillment worker started');
+
+  // ==========================================================================
+  // 12. Initialize Cron Scheduler
+  // ==========================================================================
   const cronScheduler = new CronScheduler(logger);
 
+  // Stock synchronization (every 6 hours)
   cronScheduler.registerTask({
     name: 'stock-sync',
     schedule: env.CRON_STOCK_SYNC,
     handler: async () => {
-      logger.info('Running stock synchronization...');
+      logger.info('Starting stock synchronization with AliExpress...');
+
+      try {
+        const products = await prisma.product.findMany({
+          where: { isActive: true },
+          select: { id: true, aliexpressId: true },
+        });
+
+        let updated = 0;
+        let errors = 0;
+
+        for (const product of products) {
+          try {
+            const stock = await aliexpressAdapter.getProductStock(product.aliexpressId);
+
+            await prisma.product.update({
+              where: { id: product.id },
+              data: {
+                stock,
+                lastSyncAt: new Date(),
+              },
+            });
+
+            updated++;
+          } catch (error) {
+            errors++;
+            logger.error('Failed to sync product stock', {
+              productId: product.id,
+              aliexpressId: product.aliexpressId,
+              error: error instanceof Error ? error.message : 'Unknown',
+            });
+          }
+        }
+
+        logger.info('Stock synchronization completed', {
+          total: products.length,
+          updated,
+          errors,
+        });
+      } catch (error) {
+        logger.error('Stock synchronization failed', {
+          error: error instanceof Error ? error.message : 'Unknown',
+        });
+      }
     },
   });
 
+  // Tracking synchronization (every 6 hours)
+  const trackingSyncJob = createTrackingSyncJob(prisma, {
+    appKey: env.ALIEXPRESS_APP_KEY,
+    appSecret: env.ALIEXPRESS_APP_SECRET,
+    accessToken: env.ALIEXPRESS_ACCESS_TOKEN,
+    trackingId: env.ALIEXPRESS_TRACKING_ID,
+  });
+
+  cronScheduler.registerTask({
+    name: 'tracking-sync',
+    schedule: '0 */6 * * *',
+    handler: async () => {
+      await trackingSyncJob.execute();
+    },
+  });
+
+  // Data cleanup (daily at midnight)
   cronScheduler.registerTask({
     name: 'data-cleanup',
     schedule: env.CRON_DATA_CLEANUP,
     handler: async () => {
       logger.info('Running data cleanup...');
+
+      try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const deletedWebhooks = await prisma.webhookEvent.deleteMany({
+          where: {
+            status: 'completed',
+            processedAt: { lt: thirtyDaysAgo },
+          },
+        });
+
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+        const deletedAuditLogs = await prisma.auditLog.deleteMany({
+          where: {
+            createdAt: { lt: oneYearAgo },
+          },
+        });
+
+        logger.info('Data cleanup completed', {
+          deletedWebhooks: deletedWebhooks.count,
+          deletedAuditLogs: deletedAuditLogs.count,
+        });
+      } catch (error) {
+        logger.error('Data cleanup failed', {
+          error: error instanceof Error ? error.message : 'Unknown',
+        });
+      }
     },
   });
 
   cronScheduler.start();
-
-  messageQueue.registerHandler('orders', async (data) => {
-    logger.info('Processing order', { data });
-    return { success: true };
+  logger.info('Cron scheduler started', {
+    tasks: cronScheduler.getTaskNames(),
   });
 
-  const server = app.listen(env.PORT, () => {
+  // ==========================================================================
+  // 13. Start HTTP Server
+  // ==========================================================================
+  const server = app.listen(env.PORT, async () => {
+    logger.info('========================================');
     logger.info(`Server listening on port ${env.PORT}`);
+    logger.info('========================================');
+    logger.info('Available endpoints:');
+    logger.info('  - GET  /health');
+    logger.info('  - GET  /ready');
+    logger.info('  - GET  /api/health/detailed');
+    logger.info('  - POST /webhooks/hyp');
+    logger.info('  - GET  /webhooks/hyp/success');
+    logger.info('  - GET  /webhooks/hyp/error');
+    logger.info('  - GET  /api/aliexpress/authorize');
+    logger.info('  - GET  /api/aliexpress/callback');
+    logger.info('  - GET  /api/aliexpress/status');
+    logger.info('  - GET  /api/v1/products');
+    logger.info('Admin API:');
+    logger.info('  - GET  /api/admin/health');
+    logger.info('  - GET  /api/admin/imports');
+    logger.info('  - POST /api/admin/imports/run');
+    logger.info('  - GET  /api/admin/quarantine');
+    logger.info('  - GET  /api/admin/orders');
+    logger.info('  - GET  /api/admin/settings');
+    logger.info('  - PUT  /api/admin/settings');
+    logger.info('  - POST /api/admin/prices/recalculate');
+    logger.info('  - GET  /api/admin/stats');
+    logger.info('========================================');
+
+    // Initial AliExpress sync on startup
+    try {
+      const productCount = await prisma.product.count();
+
+      if (productCount === 0) {
+        logger.info('========================================');
+        logger.info('No products found - Starting initial AliExpress sync...');
+        logger.info('========================================');
+
+        const credential = await prisma.aliExpressCredential.findFirst({
+          where: { isActive: true },
+        });
+
+        if (credential && credential.expiresAt && credential.expiresAt > new Date()) {
+          logger.info('Running initial product import...');
+
+          lastImportResult = await productImportJob.execute({
+            feedName: 'DS_France_topsellers',
+            maxProducts: 10,
+            minScore: adminSettings.minProductScore,
+            quarantineThreshold: adminSettings.quarantineThreshold,
+            priceMultiplier: adminSettings.priceMultiplier,
+            dryRun: false,
+          });
+
+          logger.info('========================================');
+          logger.info('Initial import completed!');
+          logger.info(`  Imported: ${lastImportResult.importedCount} products`);
+          logger.info(`  Quarantined: ${lastImportResult.quarantinedCount} products`);
+          logger.info(`  Rejected: ${lastImportResult.rejectedCount} products`);
+          logger.info('========================================');
+        } else {
+          logger.warn('========================================');
+          logger.warn('AliExpress OAuth not configured or expired!');
+          logger.warn('Visit /api/aliexpress/authorize to set up OAuth');
+          logger.warn('========================================');
+        }
+      } else {
+        logger.info(`Database contains ${productCount} products - skipping initial sync`);
+      }
+    } catch (error) {
+      logger.error('Initial sync failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   });
 
+  // ==========================================================================
+  // 14. Graceful Shutdown Handler
+  // ==========================================================================
   const gracefulShutdown = async (signal: string): Promise<void> => {
     logger.info(`Received ${signal}, starting graceful shutdown...`);
 
@@ -144,13 +892,24 @@ async function bootstrap(): Promise<void> {
     server.close(async () => {
       logger.info('HTTP server closed');
 
+      await hypPaymentWorker.close();
+      logger.info('Hyp payment worker stopped');
+
+      await fulfillmentWorker.close();
+      logger.info('Fulfillment worker stopped');
+
       await messageQueue.close();
       logger.info('Message queue closed');
+
+      await redisConnection.quit();
+      logger.info('Redis connection closed');
 
       await prisma.$disconnect();
       logger.info('Prisma disconnected');
 
+      logger.info('========================================');
       logger.info('Graceful shutdown complete');
+      logger.info('========================================');
       process.exit(0);
     });
 
@@ -164,22 +923,29 @@ async function bootstrap(): Promise<void> {
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
   process.on('uncaughtException', (error) => {
-    logger.error('Uncaught exception', { error: error.message, stack: error.stack });
+    logger.error('Uncaught exception', {
+      error: error.message,
+      stack: error.stack,
+    });
     process.exit(1);
   });
 
-  process.on('unhandledRejection', (reason) => {
-    logger.error('Unhandled rejection', { reason });
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled rejection', {
+      reason: reason instanceof Error ? reason.message : String(reason),
+      promise: String(promise),
+    });
   });
 }
 
+// ============================================================================
+// Entry Point
+// ============================================================================
+
 bootstrap().catch((error) => {
-  console.error('Failed to start application:', error);
+  console.error('========================================');
+  console.error('FATAL: Failed to start application');
+  console.error('========================================');
+  console.error(error);
   process.exit(1);
 });
-
-export { aliexpressAdapter, openaiAdapter, stripeAdapter };
-
-const aliexpressAdapter: AliExpressAdapter = null as never;
-const openaiAdapter: OpenAIAdapter = null as never;
-const stripeAdapter: StripeAdapter = null as never;

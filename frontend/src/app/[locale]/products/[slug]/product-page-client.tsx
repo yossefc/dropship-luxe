@@ -7,6 +7,7 @@ import { ShoppingBag, ArrowLeft } from 'lucide-react';
 import { ProductGallery } from '@/components/product/product-gallery-i18n';
 import { ProductInfo, type ProductInfoData, type ShadeOption, type SizeOption } from '@/components/product/product-info-i18n';
 import { ProductAccordions } from '@/components/product/product-accordions';
+import { AllergyDisclaimer } from '@/components/product/allergy-disclaimer';
 import { useCartStore } from '@/lib/store/cart-store';
 import { Link } from '@/i18n/routing';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
@@ -230,7 +231,7 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
               <ProductInfo product={productInfoData} onAddToCart={handleAddToCart} />
 
               {/* Accordions */}
-              <div className="px-6 lg:px-8 lg:pr-16 pb-12">
+              <div className="px-6 lg:px-8 lg:pr-16 pb-8">
                 <ProductAccordions
                   description={product.translation.description}
                   descriptionHtml={product.translation.descriptionHtml}
@@ -238,6 +239,11 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                   ingredients={product.translation.ingredients}
                   howToUse={product.translation.howToUse}
                 />
+              </div>
+
+              {/* Allergy Disclaimer */}
+              <div className="px-6 lg:px-8 lg:pr-16 pb-12">
+                <AllergyDisclaimer variant="compact" showPatchTestInfo />
               </div>
             </div>
           </div>

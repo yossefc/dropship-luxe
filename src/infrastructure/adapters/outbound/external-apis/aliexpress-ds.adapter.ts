@@ -308,10 +308,14 @@ export class AliExpressDSAdapter {
 
       if (methodResponse) {
         // Check for method-level error
-        if (methodResponse.rsp_code && methodResponse.rsp_code !== '200') {
+        // Note: rsp_code can be number (200) or string ("200") depending on the API method
+        const rspCode = methodResponse.rsp_code;
+        const isSuccess = rspCode === 200 || rspCode === '200';
+
+        if (rspCode && !isSuccess) {
           throw new ExternalServiceError(
             'AliExpress DS',
-            `${methodResponse.rsp_code}: ${methodResponse.rsp_msg ?? 'Unknown error'}`
+            `${rspCode}: ${methodResponse.rsp_msg ?? 'Unknown error'}`
           );
         }
 

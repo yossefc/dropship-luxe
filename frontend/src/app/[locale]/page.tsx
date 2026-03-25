@@ -1,7 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingBag } from 'lucide-react';
+import { ShoppingBag, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BentoContainer, BentoImageCell, BentoTextCell } from '@/components/home/bento-grid';
 import { ProductCard, type ProductCardData } from '@/components/home/product-card';
@@ -10,8 +11,10 @@ import { useCartStore } from '@/lib/store/cart-store';
 import { Link } from '@/i18n/routing';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
 
-// Mock data - In production, this comes from the API with translations
-const featuredProducts: ProductCardData[] = [
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+
+// Fallback products si l'API n'est pas disponible
+const fallbackProducts: ProductCardData[] = [
   {
     id: '1',
     slug: 'serum-eclat-vitamine-c',
@@ -36,33 +39,65 @@ const featuredProducts: ProductCardData[] = [
     badge: 'new',
     rating: 4.9,
   },
-  {
-    id: '3',
-    slug: 'huile-precieuse-rose',
-    name: 'Huile Précieuse à la Rose',
-    brand: 'Fleur de Luxe',
-    price: 145,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=600&h=800&fit=crop',
-    rating: 4.7,
-  },
-  {
-    id: '4',
-    slug: 'masque-hydratant-intense',
-    name: 'Masque Hydratant Intense',
-    brand: 'Aqua Pure',
-    price: 68,
-    originalPrice: 85,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=600&h=800&fit=crop',
-    badge: 'sale',
-    rating: 4.6,
-  },
 ];
+
+interface ApiProduct {
+  id: string;
+  aliexpressId: string;
+  name: string;
+  supplierName: string;
+  sellingPrice: number;
+  basePrice: number;
+  currency: string;
+  images: string[];
+  rating: number;
+  importScore: number;
+  translations?: Array<{
+    locale: string;
+    name: string;
+    slug: string;
+  }>;
+}
 
 export default function HomePage(): JSX.Element {
   const { openCart } = useCartStore();
   const t = useTranslations();
+  const [products, setProducts] = useState<ProductCardData[]>(fallbackProducts);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const res = await fetch(`${API_URL}/products`);
+        if (!res.ok) throw new Error('API error');
+
+        const data = await res.json();
+
+        if (data.success && data.data?.length > 0) {
+          const mappedProducts: ProductCardData[] = data.data.slice(0, 8).map((p: ApiProduct) => ({
+            id: p.id,
+            slug: p.translations?.[0]?.slug || p.aliexpressId,
+            name: p.translations?.[0]?.name || p.name,
+            brand: p.supplierName || 'Dropship Luxe',
+            price: p.sellingPrice,
+            originalPrice: p.basePrice > p.sellingPrice ? p.basePrice * 2.5 : undefined,
+            currency: p.currency || 'EUR',
+            image: p.images?.[0] || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=800&fit=crop',
+            hoverImage: p.images?.[1],
+            badge: p.importScore >= 90 ? 'bestseller' : p.importScore >= 80 ? 'new' : undefined,
+            rating: p.rating || 4.5,
+          }));
+          setProducts(mappedProducts);
+        }
+      } catch (error) {
+        console.log('Using fallback products:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchProducts();
+  }, []);
 
   return (
     <main className="min-h-screen">
@@ -143,22 +178,28 @@ export default function HomePage(): JSX.Element {
           </motion.div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {featuredProducts.map((product, index) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                index={index}
-                onAddToCart={(p) => {
-                  useCartStore.getState().addItem({
-                    productId: p.id,
-                    name: p.name,
-                    brand: p.brand,
-                    image: p.image,
-                    price: p.price,
-                  });
-                }}
-              />
-            ))}
+            {loading ? (
+              <div className="col-span-full flex justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-accent-gold" />
+              </div>
+            ) : (
+              products.map((product, index) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  index={index}
+                  onAddToCart={(p) => {
+                    useCartStore.getState().addItem({
+                      productId: p.id,
+                      name: p.name,
+                      brand: p.brand,
+                      image: p.image,
+                      price: p.price,
+                    });
+                  }}
+                />
+              ))
+            )}
           </div>
 
           <div className="text-center mt-12">

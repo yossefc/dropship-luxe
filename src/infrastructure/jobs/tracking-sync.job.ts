@@ -11,7 +11,10 @@
 import cron from 'node-cron';
 import { PrismaClient, SupplierOrderStatus, OrderStatus } from '@prisma/client';
 import { AliExpressAdapter, AliExpressConfig } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
-import { logger } from '@shared/utils/logger.js';
+import { createLogger } from '@infrastructure/config/logger.js';
+
+// Create a logger instance for this job
+const logger = createLogger({ level: 'info', logsDir: './logs', retentionDays: 365 });
 
 // ============================================================================
 // Configuration

@@ -36,10 +36,26 @@ import { createAliExpressOAuthRouter } from '@infrastructure/http/controllers/al
 
 // Jobs & Workers
 import { TrackingSyncJob, createTrackingSyncJob } from '@infrastructure/jobs/tracking-sync.job.js';
+import { ProductImportJob, createProductImportJob, ImportJobResult } from '@infrastructure/jobs/product-import.job.js';
 
 // ============================================================================
 // Types
 // ============================================================================
+
+interface SystemHealthStatus {
+  database: { status: 'healthy' | 'unhealthy'; latencyMs?: number };
+  redis: { status: 'healthy' | 'unhealthy'; latencyMs?: number };
+  aliexpress: { status: 'healthy' | 'unhealthy' | 'unknown'; lastCheck?: string };
+  openai: { status: 'healthy' | 'unhealthy' | 'unknown'; lastCheck?: string };
+  hyp: { status: 'healthy' | 'configured'; masof?: string };
+}
+
+interface AdminSettings {
+  priceMultiplier: number;
+  minProductScore: number;
+  quarantineThreshold: number;
+  autoImportEnabled: boolean;
+}
 
 interface BootstrapResult {
   shutdown: () => Promise<void>;
@@ -213,6 +229,293 @@ export async function bootstrap(): Promise<BootstrapResult> {
       checks,
     });
   });
+
+  // ==========================================================================
+  // 8b. Admin API Routes (Protected)
+  // ==========================================================================
+
+  // Simple admin auth middleware
+  const adminAuth = (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    const adminPassword = process.env.ADMIN_PASSWORD ?? 'dropship-luxe-admin-2024';
+
+    if (!authHeader || authHeader !== `Bearer ${adminPassword}`) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    next();
+  };
+
+  // Initialize product import job
+  const productImportJob = createProductImportJob(prisma);
+  let lastImportResult: ImportJobResult | null = null;
+
+  // Admin Settings (in-memory, should be persisted in production)
+  let adminSettings: AdminSettings = {
+    priceMultiplier: 2.5,
+    minProductScore: 65,
+    quarantineThreshold: 50,
+    autoImportEnabled: false,
+  };
+
+  // GET /api/admin/health - System health status
+  app.get('/api/admin/health', adminAuth, async (_req, res) => {
+    const health: SystemHealthStatus = {
+      database: { status: 'unhealthy' },
+      redis: { status: 'unhealthy' },
+      aliexpress: { status: 'unknown' },
+      openai: { status: 'unknown' },
+      hyp: { status: 'configured', masof: env.HYP_MASOF?.substring(0, 4) + '****' },
+    };
+
+    // Database check
+    try {
+      const start = Date.now();
+      await prisma.$queryRaw`SELECT 1`;
+      health.database = { status: 'healthy', latencyMs: Date.now() - start };
+    } catch {
+      health.database = { status: 'unhealthy' };
+    }
+
+    // Redis check
+    try {
+      const start = Date.now();
+      await redisConnection.ping();
+      health.redis = { status: 'healthy', latencyMs: Date.now() - start };
+    } catch {
+      health.redis = { status: 'unhealthy' };
+    }
+
+    // AliExpress check (based on last credential status)
+    try {
+      const credential = await prisma.aliExpressCredential.findFirst({
+        where: { isActive: true },
+      });
+      if (credential && credential.expiresAt && credential.expiresAt > new Date()) {
+        health.aliexpress = { status: 'healthy', lastCheck: credential.lastUsedAt?.toISOString() };
+      } else {
+        health.aliexpress = { status: 'unhealthy', lastCheck: credential?.lastUsedAt?.toISOString() };
+      }
+    } catch {
+      health.aliexpress = { status: 'unknown' };
+    }
+
+    // OpenAI check (assume healthy if API key is configured)
+    health.openai = {
+      status: env.OPENAI_API_KEY?.startsWith('sk-') ? 'healthy' : 'unhealthy',
+      lastCheck: new Date().toISOString(),
+    };
+
+    res.json(health);
+  });
+
+  // GET /api/admin/imports - Get import history
+  app.get('/api/admin/imports', adminAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const imports = await prisma.importHistory.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+      });
+
+      res.json({
+        imports,
+        lastResult: lastImportResult,
+      });
+    } catch (error) {
+      logger.error('Failed to fetch import history', { error });
+      res.status(500).json({ error: 'Failed to fetch imports' });
+    }
+  });
+
+  // POST /api/admin/imports/run - Trigger manual import
+  app.post('/api/admin/imports/run', adminAuth, async (req, res) => {
+    try {
+      const { feedName, maxProducts, dryRun } = req.body;
+
+      logger.info('Manual import triggered', { feedName, maxProducts, dryRun });
+
+      // Run import asynchronously
+      res.json({ status: 'started', message: 'Import job started' });
+
+      lastImportResult = await productImportJob.execute({
+        feedName: feedName ?? 'DS_France_topsellers',
+        maxProducts: maxProducts ?? 20,
+        minScore: adminSettings.minProductScore,
+        quarantineThreshold: adminSettings.quarantineThreshold,
+        priceMultiplier: adminSettings.priceMultiplier,
+        dryRun: dryRun ?? false,
+      });
+
+      logger.info('Manual import completed', { result: lastImportResult });
+    } catch (error) {
+      logger.error('Manual import failed', { error });
+    }
+  });
+
+  // GET /api/admin/quarantine - Get quarantined products
+  app.get('/api/admin/quarantine', adminAuth, async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const quarantined = await prisma.productQuarantine.findMany({
+        where: status ? { status: status as any } : undefined,
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+
+      res.json({ products: quarantined });
+    } catch (error) {
+      logger.error('Failed to fetch quarantine', { error });
+      res.status(500).json({ error: 'Failed to fetch quarantine' });
+    }
+  });
+
+  // GET /api/admin/orders - Get orders with payment and supplier status
+  app.get('/api/admin/orders', adminAuth, async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const orders = await prisma.order.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: {
+          items: true,
+          supplierOrders: true,
+        },
+      });
+
+      const formattedOrders = orders.map(order => ({
+        id: order.id,
+        orderNumber: order.orderNumber,
+        customerEmail: order.customerEmail,
+        total: order.total,
+        currency: order.currency,
+        paymentStatus: order.paymentStatus,
+        orderStatus: order.status,
+        supplierStatus: order.supplierOrders.length > 0
+          ? order.supplierOrders.every(s => s.status === 'delivered')
+            ? 'delivered'
+            : order.supplierOrders.some(s => s.status === 'shipped')
+            ? 'shipped'
+            : order.supplierOrders.some(s => s.status === 'submitted')
+            ? 'processing'
+            : 'pending'
+          : 'none',
+        trackingNumbers: order.supplierOrders
+          .filter(s => s.trackingNumber)
+          .map(s => s.trackingNumber),
+        createdAt: order.createdAt,
+        paidAt: order.paidAt,
+      }));
+
+      res.json({ orders: formattedOrders });
+    } catch (error) {
+      logger.error('Failed to fetch orders', { error });
+      res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+  });
+
+  // GET /api/admin/settings - Get admin settings
+  app.get('/api/admin/settings', adminAuth, (_req, res) => {
+    res.json(adminSettings);
+  });
+
+  // PUT /api/admin/settings - Update admin settings
+  app.put('/api/admin/settings', adminAuth, async (req, res) => {
+    try {
+      const { priceMultiplier, minProductScore, quarantineThreshold, autoImportEnabled } = req.body;
+
+      if (priceMultiplier !== undefined) adminSettings.priceMultiplier = parseFloat(priceMultiplier);
+      if (minProductScore !== undefined) adminSettings.minProductScore = parseInt(minProductScore);
+      if (quarantineThreshold !== undefined) adminSettings.quarantineThreshold = parseInt(quarantineThreshold);
+      if (autoImportEnabled !== undefined) adminSettings.autoImportEnabled = Boolean(autoImportEnabled);
+
+      logger.info('Admin settings updated', adminSettings);
+
+      res.json(adminSettings);
+    } catch (error) {
+      logger.error('Failed to update settings', { error });
+      res.status(500).json({ error: 'Failed to update settings' });
+    }
+  });
+
+  // POST /api/admin/prices/recalculate - Recalculate all prices with new multiplier
+  app.post('/api/admin/prices/recalculate', adminAuth, async (req, res) => {
+    try {
+      const { multiplier } = req.body;
+      const priceMultiplier = parseFloat(multiplier ?? adminSettings.priceMultiplier);
+
+      const products = await prisma.product.findMany({
+        where: { isActive: true },
+        select: { id: true, costPrice: true },
+      });
+
+      let updated = 0;
+      for (const product of products) {
+        const newPrice = product.costPrice.toNumber() * priceMultiplier;
+        await prisma.product.update({
+          where: { id: product.id },
+          data: { sellingPrice: newPrice },
+        });
+        updated++;
+      }
+
+      adminSettings.priceMultiplier = priceMultiplier;
+
+      logger.info('Prices recalculated', { multiplier: priceMultiplier, updated });
+
+      res.json({ success: true, updated, multiplier: priceMultiplier });
+    } catch (error) {
+      logger.error('Price recalculation failed', { error });
+      res.status(500).json({ error: 'Price recalculation failed' });
+    }
+  });
+
+  // GET /api/admin/stats - Dashboard statistics
+  app.get('/api/admin/stats', adminAuth, async (_req, res) => {
+    try {
+      const [
+        totalProducts,
+        activeProducts,
+        quarantinedCount,
+        totalOrders,
+        pendingOrders,
+        recentRevenue,
+      ] = await Promise.all([
+        prisma.product.count(),
+        prisma.product.count({ where: { isActive: true } }),
+        prisma.productQuarantine.count({ where: { status: 'pending' } }),
+        prisma.order.count(),
+        prisma.order.count({ where: { status: 'pending' } }),
+        prisma.order.aggregate({
+          where: {
+            paymentStatus: 'succeeded',
+            createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+          },
+          _sum: { total: true },
+        }),
+      ]);
+
+      res.json({
+        products: {
+          total: totalProducts,
+          active: activeProducts,
+          quarantined: quarantinedCount,
+        },
+        orders: {
+          total: totalOrders,
+          pending: pendingOrders,
+        },
+        revenue: {
+          last30Days: recentRevenue._sum.total ?? 0,
+        },
+        settings: adminSettings,
+      });
+    } catch (error) {
+      logger.error('Failed to fetch stats', { error });
+      res.status(500).json({ error: 'Failed to fetch stats' });
+    }
+  });
+
+  logger.info('Admin API routes mounted at /api/admin/*');
 
   // ==========================================================================
   // 9. Setup Error Handling
@@ -527,7 +830,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // ==========================================================================
   // 12. Start HTTP Server
   // ==========================================================================
-  const server = app.listen(env.PORT, () => {
+  const server = app.listen(env.PORT, async () => {
     logger.info('========================================');
     logger.info(`Server listening on port ${env.PORT}`);
     logger.info('========================================');
@@ -542,7 +845,93 @@ export async function bootstrap(): Promise<BootstrapResult> {
     logger.info('  - GET  /api/aliexpress/callback');
     logger.info('  - GET  /api/aliexpress/status');
     logger.info('  - GET  /api/v1/products');
+    logger.info('Admin API:');
+    logger.info('  - GET  /api/admin/health');
+    logger.info('  - GET  /api/admin/imports');
+    logger.info('  - POST /api/admin/imports/run');
+    logger.info('  - GET  /api/admin/quarantine');
+    logger.info('  - GET  /api/admin/orders');
+    logger.info('  - GET  /api/admin/settings');
+    logger.info('  - PUT  /api/admin/settings');
+    logger.info('  - POST /api/admin/prices/recalculate');
+    logger.info('  - GET  /api/admin/stats');
     logger.info('========================================');
+
+    // ==========================================================================
+    // 12b. Initial AliExpress Product Sync (Startup)
+    // ==========================================================================
+    // Check if database has products, if not, trigger initial import
+    try {
+      const productCount = await prisma.product.count();
+
+      if (productCount === 0) {
+        logger.info('========================================');
+        logger.info('No products found - Starting initial AliExpress sync...');
+        logger.info('========================================');
+
+        // Check if AliExpress OAuth is configured
+        const credential = await prisma.aliExpressCredential.findFirst({
+          where: { isActive: true },
+        });
+
+        if (credential && credential.expiresAt && credential.expiresAt > new Date()) {
+          // Run initial import with dry-run first for safety
+          logger.info('Running initial product import (dry-run first)...');
+
+          const dryRunResult = await productImportJob.execute({
+            feedName: 'DS_France_topsellers',
+            maxProducts: 10,
+            minScore: adminSettings.minProductScore,
+            quarantineThreshold: adminSettings.quarantineThreshold,
+            priceMultiplier: adminSettings.priceMultiplier,
+            dryRun: true,
+          });
+
+          logger.info('Dry-run completed', {
+            totalProcessed: dryRunResult.totalProcessed,
+            wouldImport: dryRunResult.importedCount,
+            wouldQuarantine: dryRunResult.quarantinedCount,
+            wouldReject: dryRunResult.rejectedCount,
+          });
+
+          // If dry-run looks good, run actual import
+          if (dryRunResult.importedCount > 0 || dryRunResult.quarantinedCount > 0) {
+            logger.info('Dry-run successful - Running actual import...');
+
+            lastImportResult = await productImportJob.execute({
+              feedName: 'DS_France_topsellers',
+              maxProducts: 10,
+              minScore: adminSettings.minProductScore,
+              quarantineThreshold: adminSettings.quarantineThreshold,
+              priceMultiplier: adminSettings.priceMultiplier,
+              dryRun: false,
+            });
+
+            logger.info('========================================');
+            logger.info('Initial import completed!');
+            logger.info(`  Imported: ${lastImportResult.importedCount} products`);
+            logger.info(`  Quarantined: ${lastImportResult.quarantinedCount} products`);
+            logger.info(`  Rejected: ${lastImportResult.rejectedCount} products`);
+            logger.info(`  Errors: ${lastImportResult.errorCount}`);
+            logger.info('========================================');
+          } else {
+            logger.warn('Dry-run found no products to import - check AliExpress API connection');
+          }
+        } else {
+          logger.warn('========================================');
+          logger.warn('AliExpress OAuth not configured or expired!');
+          logger.warn('Visit /api/aliexpress/authorize to set up OAuth');
+          logger.warn('========================================');
+        }
+      } else {
+        logger.info(`Database contains ${productCount} products - skipping initial sync`);
+      }
+    } catch (error) {
+      logger.error('Initial sync failed', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      // Don't crash the server on initial sync failure
+    }
   });
 
   // ==========================================================================
