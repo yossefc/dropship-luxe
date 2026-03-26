@@ -24,34 +24,34 @@ const envSchema = z.object({
   REDIS_PASSWORD: z.string().optional(),
 
   // ============================================================================
-  // Hyp (YaadPay) Payment Gateway - Remplace Stripe
+  // Hyp (YaadPay) Payment Gateway - Remplace Stripe (Optional until account created)
   // ============================================================================
-  HYP_MASOF: z.string().min(1),                    // Merchant ID (Terminal ID)
-  HYP_PASSP: z.string().min(1),                    // Terminal Password
-  HYP_API_SIGNATURE_KEY: z.string().min(16),       // API Signature Key for HMAC
-  HYP_SUCCESS_URL: z.string().url(),               // Return URL after successful payment
-  HYP_ERROR_URL: z.string().url(),                 // Return URL after failed payment
-  HYP_NOTIFY_URL: z.string().url(),                // Webhook notification URL
+  HYP_MASOF: z.string().optional(),                // Merchant ID (Terminal ID)
+  HYP_PASSP: z.string().optional(),                // Terminal Password
+  HYP_API_SIGNATURE_KEY: z.string().optional(),    // API Signature Key for HMAC
+  HYP_SUCCESS_URL: z.string().url().optional(),    // Return URL after successful payment
+  HYP_ERROR_URL: z.string().url().optional(),      // Return URL after failed payment
+  HYP_NOTIFY_URL: z.string().url().optional(),     // Webhook notification URL
 
   // ============================================================================
-  // AliExpress
+  // AliExpress (Optional until configured)
   // ============================================================================
-  ALIEXPRESS_APP_KEY: z.string(),
-  ALIEXPRESS_APP_SECRET: z.string(),
+  ALIEXPRESS_APP_KEY: z.string().optional(),
+  ALIEXPRESS_APP_SECRET: z.string().optional(),
   ALIEXPRESS_ACCESS_TOKEN: z.string().default(''),
   ALIEXPRESS_TRACKING_ID: z.string().default(''),
   ALIEXPRESS_CALLBACK_URL: z.string().url().optional(),
 
   // ============================================================================
-  // OpenAI
+  // OpenAI (Optional - needed for AI translations)
   // ============================================================================
-  OPENAI_API_KEY: z.string().startsWith('sk-'),
+  OPENAI_API_KEY: z.string().optional(),
 
   // ============================================================================
   // Security
   // ============================================================================
-  ENCRYPTION_KEY: z.string().length(64),           // 256-bit AES key (64 hex chars)
-  JWT_SECRET: z.string().min(32),
+  ENCRYPTION_KEY: z.string().default('0'.repeat(64)),  // 256-bit AES key (64 hex chars) - CHANGE IN PRODUCTION!
+  JWT_SECRET: z.string().default('change-this-secret-in-production-min-32-chars'),
   JWT_EXPIRES_IN: z.string().default('24h'),
   ADMIN_PASSWORD: z.string().min(8).optional(),
 

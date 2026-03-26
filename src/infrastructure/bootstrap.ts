@@ -130,30 +130,47 @@ export async function bootstrap(): Promise<BootstrapResult> {
   logger.info('BullMQ message queue initialized');
 
   // ==========================================================================
-  // 4. Initialize Adapters (Hyp, AliExpress, OpenAI)
+  // 4. Initialize Adapters (Hyp, AliExpress, OpenAI) - All Optional
   // ==========================================================================
 
-  // HYP ADAPTER - Remplace complètement Stripe
-  const hypAdapter = createHypAdapter(logger);
-  logger.info('Hyp (YaadPay) payment adapter initialized');
+  // HYP ADAPTER - Optional until account is created
+  let hypAdapter: HypAdapter | null = null;
+  try {
+    hypAdapter = createHypAdapter(logger);
+    logger.info('Hyp (YaadPay) payment adapter initialized');
+  } catch (error) {
+    logger.warn('Hyp adapter not configured - payment features disabled', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 
   // AliExpress OAuth Service (pour gestion des tokens)
   const aliexpressOAuthService = createAliExpressOAuthService(prisma);
 
-  // AliExpress DS Adapter (avec callback OAuth pour refresh automatique)
-  const aliexpressAdapter = new AliExpressDSAdapter({
-    appKey: env.ALIEXPRESS_APP_KEY,
-    appSecret: env.ALIEXPRESS_APP_SECRET,
-    getAccessToken: async () => aliexpressOAuthService.getValidAccessToken(),
-    trackingId: env.ALIEXPRESS_TRACKING_ID,
-  });
-  logger.info('AliExpress DS adapter initialized (with OAuth token refresh)');
+  // AliExpress DS Adapter - Optional until API keys configured
+  let aliexpressAdapter: AliExpressDSAdapter | null = null;
+  if (env.ALIEXPRESS_APP_KEY && env.ALIEXPRESS_APP_SECRET) {
+    aliexpressAdapter = new AliExpressDSAdapter({
+      appKey: env.ALIEXPRESS_APP_KEY,
+      appSecret: env.ALIEXPRESS_APP_SECRET,
+      getAccessToken: async () => aliexpressOAuthService.getValidAccessToken(),
+      trackingId: env.ALIEXPRESS_TRACKING_ID,
+    });
+    logger.info('AliExpress DS adapter initialized (with OAuth token refresh)');
+  } else {
+    logger.warn('AliExpress adapter not configured - import features disabled');
+  }
 
-  // OpenAI Adapter (pour traductions produits)
-  const openaiAdapter = new OpenAIAdapter({
-    apiKey: env.OPENAI_API_KEY,
-  });
-  logger.info('OpenAI adapter initialized');
+  // OpenAI Adapter - Optional until API key configured
+  let openaiAdapter: OpenAIAdapter | null = null;
+  if (env.OPENAI_API_KEY) {
+    openaiAdapter = new OpenAIAdapter({
+      apiKey: env.OPENAI_API_KEY,
+    });
+    logger.info('OpenAI adapter initialized');
+  } else {
+    logger.warn('OpenAI adapter not configured - AI translation disabled');
+  }
 
   // ==========================================================================
   // 5. Create Express Server
@@ -163,17 +180,24 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // ==========================================================================
   // 6. Mount Hyp Webhook Routes (CRITICAL - Payment Processing)
   // ==========================================================================
-  const { router: hypWebhookRouter, controller: hypWebhookController } = createHypWebhookRouter(
-    hypAdapter,
-    prisma,
-    bullmqConnectionOptions,
-    logger,
-    auditLogger
-  );
+  let hypWebhookController: HypWebhookController | null = null;
 
-  // Hyp envoie les webhooks en URL-encoded, on doit parser correctement
-  app.use('/webhooks/hyp', hypWebhookRouter);
-  logger.info('Hyp webhook routes mounted at /webhooks/hyp');
+  if (hypAdapter) {
+    const { router: hypWebhookRouter, controller } = createHypWebhookRouter(
+      hypAdapter,
+      prisma,
+      bullmqConnectionOptions,
+      logger,
+      auditLogger
+    );
+    hypWebhookController = controller;
+
+    // Hyp envoie les webhooks en URL-encoded, on doit parser correctement
+    app.use('/webhooks/hyp', hypWebhookRouter);
+    logger.info('Hyp webhook routes mounted at /webhooks/hyp');
+  } else {
+    logger.warn('Hyp webhook routes NOT mounted - payment processing disabled');
+  }
 
   // ==========================================================================
   // 7. Mount AliExpress OAuth Routes
@@ -219,6 +243,15 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // ==========================================================================
   app.post('/api/v1/orders', async (req, res) => {
     try {
+      // Check if payment gateway is configured
+      if (!hypAdapter) {
+        res.status(503).json({
+          success: false,
+          error: 'Payment gateway not configured. Please contact support.',
+        });
+        return;
+      }
+
       const {
         customer,
         shippingAddress,
@@ -498,7 +531,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
       redis: { status: 'unhealthy' },
       aliexpress: { status: 'unknown' },
       openai: { status: 'unknown' },
-      hyp: { status: 'configured', masof: env.HYP_MASOF?.substring(0, 4) + '****' },
+      hyp: { status: hypAdapter ? 'configured' : 'not_configured', masof: env.HYP_MASOF ? env.HYP_MASOF.substring(0, 4) + '****' : 'N/A' },
     };
 
     // Database check
@@ -533,9 +566,9 @@ export async function bootstrap(): Promise<BootstrapResult> {
       health.aliexpress = { status: 'unknown' };
     }
 
-    // OpenAI check (assume healthy if API key is configured)
+    // OpenAI check (assume healthy if adapter is configured)
     health.openai = {
-      status: env.OPENAI_API_KEY?.startsWith('sk-') ? 'healthy' : 'unhealthy',
+      status: openaiAdapter ? 'healthy' : 'not_configured',
       lastCheck: new Date().toISOString(),
     };
 
@@ -760,272 +793,294 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // 10. Initialize Workers (BullMQ)
   // ==========================================================================
 
-  // Worker pour traiter les paiements Hyp
-  const hypPaymentWorker = new Worker<PaymentProcessingJob>(
-    'hyp-payments',
-    async (job) => {
-      const { eventType } = job.data;
+  // Worker pour traiter les paiements Hyp (only if Hyp is configured)
+  let hypPaymentWorker: Worker<PaymentProcessingJob> | null = null;
 
-      logger.info('Processing Hyp payment job', {
-        jobId: job.id,
-        eventType,
-        orderId: job.data.orderId,
-      });
+  if (hypWebhookController) {
+    hypPaymentWorker = new Worker<PaymentProcessingJob>(
+      'hyp-payments',
+      async (job) => {
+        const { eventType } = job.data;
 
-      switch (eventType) {
-        case 'payment.succeeded':
-          await hypWebhookController.processSuccessfulPayment(job.data);
-          break;
+        logger.info('Processing Hyp payment job', {
+          jobId: job.id,
+          eventType,
+          orderId: job.data.orderId,
+        });
 
-        case 'payment.failed':
-        case 'payment.canceled':
-          await hypWebhookController.processFailedPayment(job.data);
-          break;
+        switch (eventType) {
+          case 'payment.succeeded':
+            await hypWebhookController!.processSuccessfulPayment(job.data);
+            break;
 
-        default:
-          logger.warn('Unhandled payment event type', { eventType });
+          case 'payment.failed':
+          case 'payment.canceled':
+            await hypWebhookController!.processFailedPayment(job.data);
+            break;
+
+          default:
+            logger.warn('Unhandled payment event type', { eventType });
+        }
+
+        return { processed: true, eventType };
+      },
+      {
+        connection: bullmqConnectionOptions,
+        concurrency: 5,
       }
+    );
 
-      return { processed: true, eventType };
-    },
-    {
-      connection: bullmqConnectionOptions,
-      concurrency: 5,
-    }
-  );
-
-  hypPaymentWorker.on('completed', (job, result) => {
-    logger.info('Hyp payment job completed', {
-      jobId: job.id,
-      eventType: job.data.eventType,
-      result,
+    hypPaymentWorker.on('completed', (job, result) => {
+      logger.info('Hyp payment job completed', {
+        jobId: job.id,
+        eventType: job.data.eventType,
+        result,
+      });
     });
-  });
 
-  hypPaymentWorker.on('failed', (job, error) => {
-    logger.error('Hyp payment job failed', {
-      jobId: job?.id,
-      eventType: job?.data.eventType,
-      error: error.message,
+    hypPaymentWorker.on('failed', (job, error) => {
+      logger.error('Hyp payment job failed', {
+        jobId: job?.id,
+        eventType: job?.data.eventType,
+        error: error.message,
+      });
     });
-  });
 
-  logger.info('Hyp payment worker started');
+    logger.info('Hyp payment worker started');
+  } else {
+    logger.warn('Hyp payment worker NOT started - payment processing disabled');
+  }
 
-  // Worker pour le fulfillment AliExpress
-  const fulfillmentWorker = new Worker(
-    'order-fulfillment',
-    async (job) => {
-      const { orderId } = job.data;
+  // Worker pour le fulfillment AliExpress (only if AliExpress is configured)
+  let fulfillmentWorker: Worker | null = null;
 
-      logger.info('Processing AliExpress fulfillment', { orderId });
+  if (aliexpressAdapter) {
+    const aliExpressAdapterRef = aliexpressAdapter; // Capture for closure
+    fulfillmentWorker = new Worker(
+      'order-fulfillment',
+      async (job) => {
+        const { orderId } = job.data;
 
-      // Récupérer la commande avec ses items
-      const order = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: {
-          items: {
-            include: {
-              product: true,
+        logger.info('Processing AliExpress fulfillment', { orderId });
+
+        // Récupérer la commande avec ses items
+        const order = await prisma.order.findUnique({
+          where: { id: orderId },
+          include: {
+            items: {
+              include: {
+                product: true,
+              },
             },
           },
-        },
-      });
+        });
 
-      if (!order) {
-        throw new Error(`Order not found: ${orderId}`);
-      }
-
-      // Créer les commandes fournisseur pour chaque item
-      for (const item of order.items) {
-        try {
-          // Sanitiser l'adresse
-          const sanitizedFirstName = order.shippingFirstName
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toUpperCase();
-          const sanitizedLastName = order.shippingLastName
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toUpperCase();
-          const sanitizedStreet = order.shippingStreet
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toUpperCase();
-          const sanitizedCity = order.shippingCity
-            .normalize('NFD')
-            .replace(/[\u0300-\u036f]/g, '')
-            .toUpperCase();
-          const sanitizedPostalCode = order.shippingPostalCode.replace(/\s/g, '');
-          const sanitizedCountry = order.shippingCountry.toUpperCase();
-          const sanitizedPhone = order.shippingPhone ?? '';
-
-          // Create Address value object for supplier
-          const shippingAddress = Address.create({
-            firstName: sanitizedFirstName,
-            lastName: sanitizedLastName,
-            street: sanitizedStreet,
-            city: sanitizedCity,
-            postalCode: sanitizedPostalCode,
-            country: sanitizedCountry,
-            ...(sanitizedPhone ? { phone: sanitizedPhone } : {}),
-          });
-
-          // Créer l'enregistrement SupplierOrder
-          const supplierOrder = await prisma.supplierOrder.create({
-            data: {
-              orderId: order.id,
-              productId: item.productId,
-              variantId: item.variantId,
-              quantity: item.quantity,
-              unitCost: item.supplierPrice,
-              shippingCost: 0,
-              totalCost: item.supplierPrice.toNumber() * item.quantity,
-              shippingName: `${sanitizedFirstName} ${sanitizedLastName}`,
-              shippingAddress: sanitizedStreet,
-              shippingCity: sanitizedCity,
-              shippingPostalCode: sanitizedPostalCode,
-              shippingCountry: sanitizedCountry,
-              shippingPhone: sanitizedPhone,
-              status: 'pending',
-            },
-          });
-
-          // Soumettre à AliExpress
-          const result = await aliexpressAdapter.placeOrder(
-            [
-              {
-                productId: item.product.aliexpressId,
-                variantId: item.variantId ?? undefined,
-                quantity: item.quantity,
-              },
-            ],
-            shippingAddress
-          );
-
-          // Mettre à jour avec l'ID AliExpress
-          await prisma.supplierOrder.update({
-            where: { id: supplierOrder.id },
-            data: {
-              aliexpressOrderId: result.orderId,
-              status: 'submitted',
-              submittedAt: new Date(),
-            },
-          });
-
-          logger.info('AliExpress order created', {
-            supplierOrderId: supplierOrder.id,
-            aliexpressOrderId: result.orderId,
-          });
-
-        } catch (error) {
-          logger.error('Failed to create AliExpress order', {
-            orderId,
-            itemId: item.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
+        if (!order) {
+          throw new Error(`Order not found: ${orderId}`);
         }
+
+        // Créer les commandes fournisseur pour chaque item
+        for (const item of order.items) {
+          try {
+            // Sanitiser l'adresse
+            const sanitizedFirstName = order.shippingFirstName
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toUpperCase();
+            const sanitizedLastName = order.shippingLastName
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toUpperCase();
+            const sanitizedStreet = order.shippingStreet
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toUpperCase();
+            const sanitizedCity = order.shippingCity
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toUpperCase();
+            const sanitizedPostalCode = order.shippingPostalCode.replace(/\s/g, '');
+            const sanitizedCountry = order.shippingCountry.toUpperCase();
+            const sanitizedPhone = order.shippingPhone ?? '';
+
+            // Create Address value object for supplier
+            const shippingAddress = Address.create({
+              firstName: sanitizedFirstName,
+              lastName: sanitizedLastName,
+              street: sanitizedStreet,
+              city: sanitizedCity,
+              postalCode: sanitizedPostalCode,
+              country: sanitizedCountry,
+              ...(sanitizedPhone ? { phone: sanitizedPhone } : {}),
+            });
+
+            // Créer l'enregistrement SupplierOrder
+            const supplierOrder = await prisma.supplierOrder.create({
+              data: {
+                orderId: order.id,
+                productId: item.productId,
+                variantId: item.variantId,
+                quantity: item.quantity,
+                unitCost: item.supplierPrice,
+                shippingCost: 0,
+                totalCost: item.supplierPrice.toNumber() * item.quantity,
+                shippingName: `${sanitizedFirstName} ${sanitizedLastName}`,
+                shippingAddress: sanitizedStreet,
+                shippingCity: sanitizedCity,
+                shippingPostalCode: sanitizedPostalCode,
+                shippingCountry: sanitizedCountry,
+                shippingPhone: sanitizedPhone,
+                status: 'pending',
+              },
+            });
+
+            // Soumettre à AliExpress
+            const result = await aliExpressAdapterRef.placeOrder(
+              [
+                {
+                  productId: item.product.aliexpressId,
+                  variantId: item.variantId ?? undefined,
+                  quantity: item.quantity,
+                },
+              ],
+              shippingAddress
+            );
+
+            // Mettre à jour avec l'ID AliExpress
+            await prisma.supplierOrder.update({
+              where: { id: supplierOrder.id },
+              data: {
+                aliexpressOrderId: result.orderId,
+                status: 'submitted',
+                submittedAt: new Date(),
+              },
+            });
+
+            logger.info('AliExpress order created', {
+              supplierOrderId: supplierOrder.id,
+              aliexpressOrderId: result.orderId,
+            });
+
+          } catch (error) {
+            logger.error('Failed to create AliExpress order', {
+              orderId,
+              itemId: item.id,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            });
+          }
+        }
+
+        // Mettre à jour le statut de la commande
+        await prisma.order.update({
+          where: { id: orderId },
+          data: { status: 'processing' },
+        });
+
+        return { processed: true, orderId };
+      },
+      {
+        connection: bullmqConnectionOptions,
+        concurrency: 3,
       }
+    );
 
-      // Mettre à jour le statut de la commande
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'processing' },
-      });
-
-      return { processed: true, orderId };
-    },
-    {
-      connection: bullmqConnectionOptions,
-      concurrency: 3,
-    }
-  );
-
-  fulfillmentWorker.on('completed', (job, result) => {
-    logger.info('Fulfillment job completed', { jobId: job.id, result });
-  });
-
-  fulfillmentWorker.on('failed', (job, error) => {
-    logger.error('Fulfillment job failed', {
-      jobId: job?.id,
-      error: error.message,
+    fulfillmentWorker.on('completed', (job, result) => {
+      logger.info('Fulfillment job completed', { jobId: job.id, result });
     });
-  });
 
-  logger.info('Order fulfillment worker started');
+    fulfillmentWorker.on('failed', (job, error) => {
+      logger.error('Fulfillment job failed', {
+        jobId: job?.id,
+        error: error.message,
+      });
+    });
+
+    logger.info('Order fulfillment worker started');
+  } else {
+    logger.warn('Order fulfillment worker NOT started - AliExpress not configured');
+  }
 
   // ==========================================================================
   // 11. Initialize Cron Scheduler
   // ==========================================================================
   const cronScheduler = new CronScheduler(logger);
 
-  // Synchronisation des stocks AliExpress (toutes les 6 heures)
-  cronScheduler.registerTask({
-    name: 'stock-sync',
-    schedule: env.CRON_STOCK_SYNC,  // '0 */6 * * *'
-    handler: async () => {
-      logger.info('Starting stock synchronization with AliExpress...');
+  // Synchronisation des stocks AliExpress (toutes les 6 heures) - only if AliExpress configured
+  if (aliexpressAdapter) {
+    const aliExpressAdapterRef = aliexpressAdapter; // Capture for closure
+    cronScheduler.registerTask({
+      name: 'stock-sync',
+      schedule: env.CRON_STOCK_SYNC,  // '0 */6 * * *'
+      handler: async () => {
+        logger.info('Starting stock synchronization with AliExpress...');
 
-      try {
-        const products = await prisma.product.findMany({
-          where: { isActive: true },
-          select: { id: true, aliexpressId: true },
-        });
+        try {
+          const products = await prisma.product.findMany({
+            where: { isActive: true },
+            select: { id: true, aliexpressId: true },
+          });
 
-        let updated = 0;
-        let errors = 0;
+          let updated = 0;
+          let errors = 0;
 
-        for (const product of products) {
-          try {
-            const stock = await aliexpressAdapter.getProductStock(product.aliexpressId);
+          for (const product of products) {
+            try {
+              const stock = await aliExpressAdapterRef.getProductStock(product.aliexpressId);
 
-            await prisma.product.update({
-              where: { id: product.id },
-              data: {
-                stock,
-                lastSyncAt: new Date(),
-              },
-            });
+              await prisma.product.update({
+                where: { id: product.id },
+                data: {
+                  stock,
+                  lastSyncAt: new Date(),
+                },
+              });
 
-            updated++;
-          } catch (error) {
-            errors++;
-            logger.error('Failed to sync product stock', {
-              productId: product.id,
-              aliexpressId: product.aliexpressId,
-              error: error instanceof Error ? error.message : 'Unknown',
-            });
+              updated++;
+            } catch (error) {
+              errors++;
+              logger.error('Failed to sync product stock', {
+                productId: product.id,
+                aliexpressId: product.aliexpressId,
+                error: error instanceof Error ? error.message : 'Unknown',
+              });
+            }
           }
+
+          logger.info('Stock synchronization completed', {
+            total: products.length,
+            updated,
+            errors,
+          });
+        } catch (error) {
+          logger.error('Stock synchronization failed', {
+            error: error instanceof Error ? error.message : 'Unknown',
+          });
         }
+      },
+    });
+  } else {
+    logger.warn('Stock sync cron task NOT registered - AliExpress not configured');
+  }
 
-        logger.info('Stock synchronization completed', {
-          total: products.length,
-          updated,
-          errors,
-        });
-      } catch (error) {
-        logger.error('Stock synchronization failed', {
-          error: error instanceof Error ? error.message : 'Unknown',
-        });
-      }
-    },
-  });
+  // Synchronisation des tracking AliExpress (toutes les 6 heures) - only if AliExpress configured
+  if (env.ALIEXPRESS_APP_KEY && env.ALIEXPRESS_APP_SECRET) {
+    const trackingSyncJob = createTrackingSyncJob(prisma, {
+      appKey: env.ALIEXPRESS_APP_KEY,
+      appSecret: env.ALIEXPRESS_APP_SECRET,
+      getAccessToken: async () => aliexpressOAuthService.getValidAccessToken(),
+      trackingId: env.ALIEXPRESS_TRACKING_ID,
+    });
 
-  // Synchronisation des tracking AliExpress (toutes les 6 heures)
-  const trackingSyncJob = createTrackingSyncJob(prisma, {
-    appKey: env.ALIEXPRESS_APP_KEY,
-    appSecret: env.ALIEXPRESS_APP_SECRET,
-    getAccessToken: async () => aliexpressOAuthService.getValidAccessToken(),
-    trackingId: env.ALIEXPRESS_TRACKING_ID,
-  });
-
-  cronScheduler.registerTask({
-    name: 'tracking-sync',
-    schedule: '0 */6 * * *',  // Toutes les 6 heures
-    handler: async () => {
-      await trackingSyncJob.execute();
-    },
-  });
+    cronScheduler.registerTask({
+      name: 'tracking-sync',
+      schedule: '0 */6 * * *',  // Toutes les 6 heures
+      handler: async () => {
+        await trackingSyncJob.execute();
+      },
+    });
+  } else {
+    logger.warn('Tracking sync cron task NOT registered - AliExpress not configured');
+  }
 
   // Nettoyage des données anciennes (quotidien à minuit)
   cronScheduler.registerTask({
@@ -1197,12 +1252,16 @@ export async function bootstrap(): Promise<BootstrapResult> {
     server.close(async () => {
       logger.info('HTTP server closed');
 
-      // 3. Arrêter les workers
-      await hypPaymentWorker.close();
-      logger.info('Hyp payment worker stopped');
+      // 3. Arrêter les workers (if they were started)
+      if (hypPaymentWorker) {
+        await hypPaymentWorker.close();
+        logger.info('Hyp payment worker stopped');
+      }
 
-      await fulfillmentWorker.close();
-      logger.info('Fulfillment worker stopped');
+      if (fulfillmentWorker) {
+        await fulfillmentWorker.close();
+        logger.info('Fulfillment worker stopped');
+      }
 
       // 4. Fermer la queue de messages
       await messageQueue.close();
