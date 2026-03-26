@@ -53,7 +53,7 @@ interface SystemHealthStatus {
   redis: { status: 'healthy' | 'unhealthy'; latencyMs?: number };
   aliexpress: { status: 'healthy' | 'unhealthy' | 'unknown'; lastCheck?: string };
   openai: { status: 'healthy' | 'unhealthy' | 'unknown'; lastCheck?: string };
-  hyp: { status: 'healthy' | 'configured'; masof?: string };
+  hyp: { status: 'healthy' | 'configured' | 'unknown'; masof?: string };
 }
 
 interface AdminSettings {
