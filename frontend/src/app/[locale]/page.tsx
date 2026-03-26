@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ShoppingBag, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BentoContainer, BentoImageCell, BentoTextCell } from '@/components/home/bento-grid';
 import { ProductCard, type ProductCardData } from '@/components/home/product-card';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/lib/store/cart-store';
 import { Link } from '@/i18n/routing';
-import { LanguageSwitcher } from '@/components/layout/language-switcher';
+import { LuxeNavbar } from '@/components/navigation';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
@@ -127,7 +127,6 @@ interface ApiProduct {
 }
 
 export default function HomePage(): JSX.Element {
-  const { openCart } = useCartStore();
   const t = useTranslations();
   const [products, setProducts] = useState<ProductCardData[]>(fallbackProducts);
   const [loading, setLoading] = useState(true);
@@ -174,40 +173,11 @@ export default function HomePage(): JSX.Element {
 
   return (
     <main className="min-h-screen">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-b border-neutral-100">
-        <div className="max-w-[1440px] mx-auto px-6 h-16 flex items-center justify-between">
-          <Link href="/" className="font-display text-2xl tracking-wide">
-            {t('common.brand.name')}
-          </Link>
-
-          <div className="hidden md:flex items-center gap-8">
-            <Link href="/collections" className="text-sm font-accent font-medium tracking-wide hover:text-accent-gold transition-colors">
-              {t('common.nav.collections')}
-            </Link>
-            <Link href="/collections/skincare" className="text-sm font-accent font-medium tracking-wide hover:text-accent-gold transition-colors">
-              {t('common.nav.skincare')}
-            </Link>
-            <Link href="/collections/makeup" className="text-sm font-accent font-medium tracking-wide hover:text-accent-gold transition-colors">
-              {t('common.nav.makeup')}
-            </Link>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <LanguageSwitcher />
-            <button
-              onClick={openCart}
-              className="relative w-10 h-10 flex items-center justify-center hover:bg-neutral-100 rounded-full transition-colors"
-              aria-label={t('common.accessibility.openCart')}
-            >
-              <ShoppingBag className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </nav>
+      {/* Navigation - Luxe Mega Menu */}
+      <LuxeNavbar />
 
       {/* Hero Section */}
-      <section className="pt-32 pb-16">
+      <section className="pt-8 pb-16">
         <BentoContainer layout="hero" className="min-h-[70vh]">
           <BentoImageCell
             src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=1200&h=1600&fit=crop"
