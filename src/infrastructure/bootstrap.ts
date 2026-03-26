@@ -1280,12 +1280,5 @@ export async function bootstrap(): Promise<BootstrapResult> {
 // ============================================================================
 // Entry Point
 // ============================================================================
-
-// Démarrer l'application si ce fichier est exécuté directement
-bootstrap().catch((error) => {
-  console.error('========================================');
-  console.error('FATAL: Failed to start application');
-  console.error('========================================');
-  console.error(error);
-  process.exit(1);
-});
+// Note: bootstrap() is called from src/index.ts - do NOT call it here
+// to avoid starting the server twice
