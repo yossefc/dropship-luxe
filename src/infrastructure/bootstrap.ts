@@ -200,47 +200,10 @@ export async function bootstrap(): Promise<BootstrapResult> {
   }
 
   // ==========================================================================
-  // 7. Mount AliExpress OAuth Routes
+  // 7. Additional Order Route with HypAdapter from bootstrap context
   // ==========================================================================
-  app.use('/api/aliexpress', createAliExpressOAuthRouter(prisma));
-  logger.info('AliExpress OAuth routes mounted at /api/aliexpress');
-
-  // ==========================================================================
-  // 8. Mount API Routes
-  // ==========================================================================
-  app.get('/api/v1/products', async (_req, res) => {
-    try {
-      const products = await prisma.product.findMany({
-        where: { isActive: true },
-        include: {
-          translations: {
-            where: { locale: 'fr' },
-          },
-          variants: {
-            where: { isActive: true },
-          },
-        },
-        take: 50,
-        orderBy: { createdAt: 'desc' },
-      });
-
-      res.json({
-        success: true,
-        data: products,
-        count: products.length,
-      });
-    } catch (error) {
-      logger.error('Failed to fetch products', { error });
-      res.status(500).json({
-        success: false,
-        error: 'Failed to fetch products',
-      });
-    }
-  });
-
-  // ==========================================================================
-  // POST /api/v1/orders - Create Order and Generate Hyp Payment Link
-  // ==========================================================================
+  // Note: AliExpress OAuth, Product, and Order routes are also mounted in server.ts
+  // This route uses the hypAdapter variable from bootstrap for order creation
   app.post('/api/v1/orders', async (req, res) => {
     try {
       // Check if payment gateway is configured
