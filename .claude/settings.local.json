@@ -45,7 +45,18 @@
       "Bash(openssl rand:*)",
       "Bash(npx vercel env add:*)",
       "Bash(npx vercel env:*)",
-      "WebFetch(domain:neon.tech)"
+      "WebFetch(domain:neon.tech)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(tasklist:*)",
+      "Bash(git reset:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(python:*)",
+      "Bash(done)",
+      "Bash(while read line)",
+      "Bash(do echo \"  ✅ $line\")",
+      "Bash(npx vercel --prod --yes)"
     ]
   }
 }
