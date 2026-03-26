@@ -767,6 +767,80 @@ export async function bootstrap(): Promise<BootstrapResult> {
     }
   });
 
+  // DELETE /api/admin/products/cleanup - Delete non-cosmetics products
+  app.delete('/api/admin/products/cleanup', adminAuth, async (req, res) => {
+    try {
+      const cosmeticsKeywords = [
+        'serum', 'cream', 'moisturizer', 'lotion', 'mask', 'cleanser', 'toner',
+        'skincare', 'skin care', 'beauty', 'cosmetic', 'makeup', 'make-up', 'lipstick',
+        'foundation', 'concealer', 'mascara', 'eyeliner', 'eyeshadow', 'blush',
+        'bronzer', 'primer', 'powder', 'facial', 'face', 'anti-aging', 'anti-wrinkle',
+        'moisturizing', 'hydrating', 'vitamin c', 'retinol', 'hyaluronic', 'collagen',
+        'sunscreen', 'spf', 'lip balm', 'lip gloss', 'perfume', 'fragrance',
+        'essence', 'ampoule', 'eye cream', 'night cream', 'day cream', 'bb cream',
+        'cc cream', 'sheet mask', 'peel', 'exfoliant', 'scrub', 'oil', 'body lotion',
+        'sérum', 'crème', 'soin', 'visage', 'peau', 'beauté', 'maquillage',
+        'hydratant', 'anti-âge', 'anti-rides', 'lèvres', 'yeux', 'teint',
+        'eyelash', 'lash', 'nail', 'hair',
+      ];
+
+      // Get all products
+      const allProducts = await prisma.product.findMany({
+        select: { id: true, name: true, originalName: true, aliexpressId: true },
+      });
+
+      const toDelete: string[] = [];
+      const toKeep: string[] = [];
+
+      for (const product of allProducts) {
+        const name = (product.name ?? product.originalName ?? '').toLowerCase();
+        const isCosmetics = cosmeticsKeywords.some(kw => name.includes(kw.toLowerCase()));
+
+        // Keep seed products (ALI001-ALI006) and cosmetics
+        if (product.aliexpressId?.startsWith('ALI') || isCosmetics) {
+          toKeep.push(product.aliexpressId ?? product.id);
+        } else {
+          toDelete.push(product.id);
+        }
+      }
+
+      // Delete non-cosmetics products and their translations
+      if (toDelete.length > 0) {
+        // Delete translations first
+        await prisma.productTranslation.deleteMany({
+          where: { productId: { in: toDelete } },
+        });
+
+        // Delete products
+        const deleted = await prisma.product.deleteMany({
+          where: { id: { in: toDelete } },
+        });
+
+        logger.info('Cleaned up non-cosmetics products', {
+          deleted: deleted.count,
+          kept: toKeep.length,
+        });
+
+        res.json({
+          success: true,
+          deleted: deleted.count,
+          kept: toKeep.length,
+          deletedIds: toDelete,
+        });
+      } else {
+        res.json({
+          success: true,
+          deleted: 0,
+          kept: toKeep.length,
+          message: 'No non-cosmetics products found',
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to cleanup products', { error });
+      res.status(500).json({ error: 'Failed to cleanup products' });
+    }
+  });
+
   logger.info('Admin API routes mounted at /api/admin/*');
 
   // ==========================================================================
