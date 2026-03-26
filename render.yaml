@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: hayoss-api
+    env: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ALIEXPRESS_APP_KEY
+        sync: false
+      - key: ALIEXPRESS_APP_SECRET
+        sync: false
+      - key: ALIEXPRESS_CALLBACK_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        value: https://www.hayoss.com
+      - key: HYP_MASOF
+        sync: false
+      - key: HYP_PASSP
+        sync: false
+      - key: HYP_API_SIGNATURE_KEY
+        sync: false
+      - key: HYP_SUCCESS_URL
+        value: https://www.hayoss.com/checkout/success
+      - key: HYP_ERROR_URL
+        value: https://www.hayoss.com/checkout/error
+      - key: HYP_NOTIFY_URL
+        sync: false
