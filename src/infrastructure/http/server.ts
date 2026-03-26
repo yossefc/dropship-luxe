@@ -10,6 +10,7 @@ import { Logger, AuditLogger } from '@infrastructure/config/logger.js';
 import { DomainError } from '@shared/errors/domain-error.js';
 import { createAliExpressOAuthRouter } from './controllers/aliexpress-oauth.controller.js';
 import { createOrderRouter } from './controllers/order.controller.js';
+import { createProductRouter } from './controllers/product.controller.js';
 import { HypAdapter, createHypAdapter } from '@infrastructure/adapters/outbound/payment/hyp.adapter.js';
 
 export interface ServerConfig {
@@ -133,6 +134,12 @@ export function createServer(
   if (prisma) {
     app.use('/api/aliexpress', createAliExpressOAuthRouter(prisma));
     logger.info('AliExpress OAuth routes mounted at /api/aliexpress');
+
+    // ============================================================================
+    // Product Routes
+    // ============================================================================
+    app.use('/api/v1/products', createProductRouter(prisma));
+    logger.info('Product routes mounted at /api/v1/products');
 
     // ============================================================================
     // Order Routes
