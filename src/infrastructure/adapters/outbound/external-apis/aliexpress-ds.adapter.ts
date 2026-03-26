@@ -1101,24 +1101,46 @@ export class AliExpressDSAdapter implements SupplierApi {
       ? params.categoryId
       : BEAUTY_HEALTH_CATEGORY_ID;
 
-    // Use the DS recommended products API
+    // Get available feed names dynamically
+    let feedName = 'DS_France_topsellers'; // Default
+    try {
+      const availableFeeds = await this.getFeedNames();
+      if (availableFeeds.length > 0) {
+        // Prefer France/EU feeds, fallback to any available
+        const preferredFeed = availableFeeds.find(f =>
+          f.feed_name.toLowerCase().includes('france') ||
+          f.feed_name.toLowerCase().includes('eu') ||
+          f.feed_name.toLowerCase().includes('europe')
+        );
+        feedName = preferredFeed?.feed_name ?? availableFeeds[0].feed_name;
+        console.log(`[AliExpress DS] Using feed: ${feedName} (from ${availableFeeds.length} available)`);
+      }
+    } catch (feedError) {
+      console.warn('[AliExpress DS] Could not get feed names, using default:', feedError);
+    }
+
+    // Use the DS recommended products API with feed_name (required parameter)
     const result = await this.executeRequest<{
-      products?: Array<{
-        product_id?: number;
-        product_title?: string;
-        sale_price?: string;
-        original_price?: string;
-        product_main_image_url?: string;
-        evaluate_rate?: string;
-        orders?: number;
-        ship_to_days?: string;
-        second_level_category_id?: number;
-        second_level_category_name?: string;
-      }>;
+      products?: {
+        traffic_product_d_t_o?: Array<{
+          product_id?: number;
+          product_title?: string;
+          sale_price?: string;
+          original_price?: string;
+          product_main_image_url?: string;
+          evaluate_rate?: string;
+          orders?: number;
+          ship_to_days?: string;
+          second_level_category_id?: number;
+          second_level_category_name?: string;
+        }>;
+      };
       total_record_count?: number;
       current_page_no?: number;
       total_page_no?: number;
     }>('aliexpress.ds.recommend.feed.get', {
+      feed_name: feedName,
+      country: 'FR',
       category_id: enforcedCategoryId,
       page_no: params.page ?? 1,
       page_size: params.pageSize ?? 50,
@@ -1127,7 +1149,10 @@ export class AliExpressDSAdapter implements SupplierApi {
       sort: 'SALE_PRICE_ASC',
     });
 
-    const rawProducts = result.products ?? [];
+    // Handle correct response structure: products.traffic_product_d_t_o[]
+    const rawProducts = result.products?.traffic_product_d_t_o ?? [];
+
+    console.log(`[AliExpress DS] Feed response: ${rawProducts.length} products found`);
 
     // Map and filter products
     const products: AliExpressProductData[] = [];
