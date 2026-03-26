@@ -28,6 +28,11 @@ const authPaths = ['/account/login', '/account/register'];
 export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Skip middleware for admin routes (not localized)
+  if (pathname.startsWith('/admin')) {
+    return NextResponse.next();
+  }
+
   // Extract potential locale from path
   const localeMatch = pathname.match(/^\/(fr|en|es|it|de)/);
   const locale = localeMatch ? localeMatch[1] : 'fr';

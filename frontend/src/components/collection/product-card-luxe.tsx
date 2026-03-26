@@ -122,7 +122,7 @@ export function ProductCardLuxe({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <Link href={`/products/${slug}`} className="block">
+      <Link href={`/${locale}/products/${slug}`} className="block">
         {/* Image Container */}
         <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-[#F9F7F5] mb-4">
           {/* Main Image */}
