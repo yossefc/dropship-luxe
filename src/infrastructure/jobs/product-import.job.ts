@@ -279,25 +279,26 @@ export class ProductImportJob {
           ae_item_base_info_dto: {
             product_id: parseInt(p.productId, 10),
             subject: p.title,
-            aeop_ae_product_propertys: [],
             detail: p.description,
           },
           ae_multimedia_info_dto: {
             image_urls: p.images.join(';'),
           },
-          ae_item_sku_info_dtos: [],
+          ae_item_sku_info_dtos: {
+            ae_item_sku_info_d_t_o: [],
+          },
           traffic_product_dto: {
-            sale_price: String(p.price.amount),
-            original_price: String(p.price.amount * 1.5),
+            sale_price: String(p.price),
+            original_price: String(p.originalPrice ?? p.price * 1.5),
             evaluate_rate: String((p.rating ?? 4.5) * 20),
-            orders: p.orderVolume ?? 0,
+            orders: p.orderCount ?? 0,
           },
           ae_store_info: {
             store_name: p.supplierName,
-            positive_rate: '95',
+            positive_rate: String(p.supplierRating ?? 95),
           },
           logistics_info_dto: {
-            delivery_time: p.shippingTimeMin?.toString() ?? '7',
+            delivery_time: p.shippingInfo?.deliveryTimeMin?.toString() ?? '7',
           },
         }));
         console.log(`[ProductImport] Found ${feedProducts.length} products in Beauty & Health category`);
