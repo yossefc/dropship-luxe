@@ -298,7 +298,7 @@ export class ProductImportJob {
             positive_rate: String(p.supplierRating ?? 95),
           },
           logistics_info_dto: {
-            delivery_time: p.shippingInfo?.deliveryTimeMin?.toString() ?? '7',
+            delivery_time: p.shippingInfo?.minDays?.toString() ?? '7',
           },
         }));
         console.log(`[ProductImport] Found ${feedProducts.length} products in Beauty & Health category`);
