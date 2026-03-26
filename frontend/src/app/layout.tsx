@@ -1,5 +1,6 @@
 import { Inter, Playfair_Display, Cormorant, Montserrat } from 'next/font/google';
 import '@/styles/globals.css';
+import { SessionProvider } from '@/components/providers/session-provider';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -36,7 +37,7 @@ export default function RootLayout({
       className={`${inter.variable} ${playfair.variable} ${cormorant.variable} ${montserrat.variable}`}
     >
       <body className="font-body bg-neutral-50 text-primary-800 antialiased">
-        {children}
+        <SessionProvider>{children}</SessionProvider>
       </body>
     </html>
   );

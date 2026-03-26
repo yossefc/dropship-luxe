@@ -8,7 +8,7 @@
 // 4. Store in database with all locale translations
 // ============================================================================
 
-import { AliExpressAdapter, validateCosmeticProduct } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
+import { AliExpressDSAdapter, validateCosmeticProduct } from '@infrastructure/adapters/outbound/external-apis/aliexpress-ds.adapter.js';
 import { OpenAIAdapter } from '@infrastructure/adapters/outbound/external-apis/openai.adapter.js';
 import { AliExpressProductData } from '@domain/ports/outbound/aliexpress.port.js';
 import { ProductScoreResult } from '@domain/services/product-score-calculator.js';
@@ -142,7 +142,7 @@ const COSMETIC_GUARDRAILS = {
 
 export class SyncAliExpressProductsUseCase {
   constructor(
-    private readonly aliexpressAdapter: AliExpressAdapter,
+    private readonly aliexpressAdapter: AliExpressDSAdapter,
     private readonly openaiAdapter: OpenAIAdapter,
     private readonly prisma: PrismaClient
   ) {}

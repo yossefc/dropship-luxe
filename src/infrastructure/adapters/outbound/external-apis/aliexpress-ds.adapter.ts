@@ -511,13 +511,13 @@ export class AliExpressDSAdapter implements SupplierApi {
   // ============================================================================
 
   /**
-   * Get product details from DS API
+   * Get product details from DS API (raw format)
    * This is a non-destructive test method
    *
    * @param productId - AliExpress product ID
    * @param options - Additional options
    */
-  async getProduct(
+  async getDSProduct(
     productId: string,
     options: {
       shipToCountry?: string;
@@ -531,6 +531,20 @@ export class AliExpressDSAdapter implements SupplierApi {
       target_currency: options.targetCurrency ?? 'EUR',
       target_language: options.targetLanguage ?? 'EN',
     });
+  }
+
+  /**
+   * Get product (SupplierApi interface)
+   * Returns product in SupplierProduct format or null if not found
+   */
+  async getProduct(productId: string): Promise<SupplierProduct | null> {
+    try {
+      const dsProduct = await this.getDSProduct(productId);
+      const productData = this.mapDSProductToAliExpressProductData(dsProduct);
+      return this.mapToSupplierProduct(productData);
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -716,7 +730,7 @@ export class AliExpressDSAdapter implements SupplierApi {
    */
   async searchProducts(params: SearchProductsParams): Promise<SupplierProduct[]> {
     const result = await this.searchProductsDetailed({
-      keywords: params.query,
+      keywords: params.query ?? '',
       categoryId: params.category,
       minPrice: params.minPrice,
       maxPrice: params.maxPrice,
@@ -732,7 +746,7 @@ export class AliExpressDSAdapter implements SupplierApi {
    */
   async getProductStock(productId: string): Promise<number> {
     try {
-      const product = await this.getProduct(productId);
+      const product = await this.getDSProduct(productId);
       const skuInfo = product.ae_item_sku_info_dtos?.ae_item_sku_info_d_t_o;
       if (skuInfo && skuInfo.length > 0) {
         const totalStock = skuInfo.reduce((sum, sku) => {
@@ -750,7 +764,7 @@ export class AliExpressDSAdapter implements SupplierApi {
    * Get product price
    */
   async getProductPrice(productId: string): Promise<Money> {
-    const product = await this.getProduct(productId);
+    const product = await this.getDSProduct(productId);
     const skuInfo = product.ae_item_sku_info_dtos?.ae_item_sku_info_d_t_o?.[0];
     const price = parseFloat(skuInfo?.sku_price ?? skuInfo?.offer_sale_price ?? '0');
     return Money.create(price, 'EUR');
@@ -773,7 +787,6 @@ export class AliExpressDSAdapter implements SupplierApi {
         contactPerson: shippingAddress.fullName,
         address: shippingAddress.street,
         city: shippingAddress.city,
-        province: shippingAddress.state,
         country: shippingAddress.country,
         postalCode: shippingAddress.postalCode,
         mobileNo: shippingAddress.phone,
@@ -1174,7 +1187,7 @@ export class AliExpressDSAdapter implements SupplierApi {
    * Get detailed product data as AliExpressProductData
    */
   async getProductDetails(productId: string): Promise<AliExpressProductData> {
-    const product = await this.getProduct(productId);
+    const product = await this.getDSProduct(productId);
     return this.mapDSProductToAliExpressProductData(product);
   }
 
@@ -1343,7 +1356,7 @@ export class AliExpressDSAdapter implements SupplierApi {
     error?: string;
   }> {
     try {
-      const product = await this.getProduct(productId);
+      const product = await this.getDSProduct(productId);
       const baseInfo = product.ae_item_base_info_dto;
       const storeInfo = product.ae_store_info;
 
@@ -1535,6 +1548,7 @@ export class AliExpressDSAdapter implements SupplierApi {
       variants: product.variants.map(v => ({
         id: v.skuId,
         name: v.name,
+        sku: v.skuId, // Use skuId as the SKU
         price: Money.create(v.price, 'EUR'),
         stock: v.stock,
         attributes: v.attributes,

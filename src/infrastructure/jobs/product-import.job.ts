@@ -397,7 +397,7 @@ export class ProductImportJob {
       for (const p of products.slice(0, maxProducts)) {
         if (p.product_id) {
           try {
-            const details = await this.dsAdapter.getProduct(String(p.product_id));
+            const details = await this.dsAdapter.getDSProduct(String(p.product_id));
             fullProducts.push(details);
           } catch (error) {
             console.warn(`[ProductImport] Could not fetch product ${p.product_id}`, error);

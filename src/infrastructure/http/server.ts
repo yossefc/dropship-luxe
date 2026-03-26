@@ -9,6 +9,8 @@ import { env } from '@infrastructure/config/env.js';
 import { Logger, AuditLogger } from '@infrastructure/config/logger.js';
 import { DomainError } from '@shared/errors/domain-error.js';
 import { createAliExpressOAuthRouter } from './controllers/aliexpress-oauth.controller.js';
+import { createOrderRouter } from './controllers/order.controller.js';
+import { HypAdapter, createHypAdapter } from '@infrastructure/adapters/outbound/payment/hyp.adapter.js';
 
 export interface ServerConfig {
   port: number;
@@ -131,6 +133,19 @@ export function createServer(
   if (prisma) {
     app.use('/api/aliexpress', createAliExpressOAuthRouter(prisma));
     logger.info('AliExpress OAuth routes mounted at /api/aliexpress');
+
+    // ============================================================================
+    // Order Routes
+    // ============================================================================
+    try {
+      const hypAdapter = createHypAdapter(logger);
+      app.use('/api/v1/orders', createOrderRouter(prisma, hypAdapter, logger));
+      logger.info('Order routes mounted at /api/v1/orders');
+    } catch (error) {
+      logger.warn('Hyp adapter not configured, order routes disabled', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   }
 
   return app;

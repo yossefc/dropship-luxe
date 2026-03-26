@@ -30,7 +30,22 @@
       "Bash(npm run build)",
       "Bash(npx tsc:*)",
       "Bash(node -e:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(echo:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(ping:*)",
+      "Bash(vercel login)",
+      "Bash(vercel:*)",
+      "Bash(if not exist \"D:\\\\dropship-luxe\\\\frontend\\\\prisma\" mkdir \"D:\\\\dropship-luxe\\\\frontend\\\\prisma\")",
+      "Bash(xcopy:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx vercel --prod)",
+      "Bash(npx vercel domains add www.hayoss.com)",
+      "Bash(npx vercel domains:*)",
+      "Bash(openssl rand:*)",
+      "Bash(npx vercel env add:*)",
+      "Bash(npx vercel env:*)",
+      "WebFetch(domain:neon.tech)"
     ]
   }
 }

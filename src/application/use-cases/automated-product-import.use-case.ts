@@ -718,7 +718,7 @@ export class AutomatedProductImportUseCase {
 export function createAutomatedImportUseCase(
   redisUrl: string,
   databaseUrl: string,
-  aliexpressConfig: AliExpressConfig,
+  aliexpressConfig: AliExpressDSConfig,
   openaiConfig: OpenAIConfig
 ): AutomatedProductImportUseCase {
   const prisma = new PrismaClient({

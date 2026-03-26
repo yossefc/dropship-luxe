@@ -7,7 +7,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useAdminAuth } from './layout';
+import { useAdminAuth } from '@/lib/hooks/use-admin-auth';
 
 // ============================================================================
 // Types
@@ -69,11 +69,11 @@ interface Order {
 // API Hook
 // ============================================================================
 
-function useAdminApi() {
+function useAdminApi(): { fetchApi: <T>(endpoint: string, options?: RequestInit) => Promise<T> } {
   const { token } = useAdminAuth();
 
   const fetchApi = useCallback(
-    async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
+    async function fetchData<T>(endpoint: string, options?: RequestInit): Promise<T> {
       const response = await fetch(endpoint, {
         ...options,
         headers: {
@@ -87,7 +87,7 @@ function useAdminApi() {
         throw new Error(`API Error: ${response.status}`);
       }
 
-      return response.json();
+      return response.json() as Promise<T>;
     },
     [token]
   );
@@ -169,10 +169,10 @@ export default function AdminDashboard() {
   };
 
   // Helpers
-  const formatCurrency = (amount: number) =>
+  const formatCurrency = (amount: number): string =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
 
-  const formatDate = (dateString: string) =>
+  const formatDate = (dateString: string): string =>
     new Date(dateString).toLocaleDateString('fr-FR', {
       day: '2-digit',
       month: '2-digit',
@@ -269,7 +269,7 @@ export default function AdminDashboard() {
             label="En quarantaine"
             value={stats?.products.quarantined ?? '-'}
             icon="⏸️"
-            highlight={stats?.products.quarantined && stats.products.quarantined > 0}
+            highlight={(stats?.products?.quarantined ?? 0) > 0}
           />
           <MetricCard
             label="Commandes"

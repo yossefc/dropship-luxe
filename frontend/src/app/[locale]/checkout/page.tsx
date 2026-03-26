@@ -206,7 +206,7 @@ export default function CheckoutPage(): JSX.Element {
       <header className="bg-primary-800 text-neutral-50 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="font-display text-2xl md:text-3xl text-center">
-            Dropship Luxe
+            Hayoss
           </h1>
         </div>
       </header>

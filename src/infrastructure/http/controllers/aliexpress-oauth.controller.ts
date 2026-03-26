@@ -14,8 +14,7 @@ import {
   AliExpressOAuthService,
   createAliExpressOAuthService,
 } from '@infrastructure/adapters/outbound/external-apis/aliexpress-oauth.service.js';
-import { AliExpressAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
-import { createAliExpressDSAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress-ds.adapter.js';
+import { AliExpressDSAdapter, createAliExpressDSAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress-ds.adapter.js';
 import { logger } from '@infrastructure/config/logger.js';
 
 // ============================================================================
@@ -307,22 +306,23 @@ export class AliExpressOAuthController {
     try {
       const accessToken = await this.oauthService.getValidAccessToken();
 
-      const adapter = new AliExpressAdapter({
+      const adapter = new AliExpressDSAdapter({
         appKey: process.env.ALIEXPRESS_APP_KEY ?? '',
         appSecret: process.env.ALIEXPRESS_APP_SECRET ?? '',
-        accessToken: '',
-        trackingId: process.env.ALIEXPRESS_TRACKING_ID ?? '',
         getAccessToken: async () => accessToken,
+        trackingId: process.env.ALIEXPRESS_TRACKING_ID ?? '',
       });
 
-      const merchantProfile = await adapter.getMerchantProfile();
+      // Test connection by fetching categories
+      const connectionResult = await adapter.testConnection();
 
       res.status(200).json({
-        success: true,
-        message: 'AliExpress API test succeeded',
+        success: connectionResult.success,
+        message: connectionResult.message,
         data: {
           tokenPreview: `${accessToken.substring(0, 8)}...`,
-          merchantProfile,
+          gateway: connectionResult.details?.gateway,
+          categoriesCount: connectionResult.details?.categoriesCount,
         },
       });
     } catch (error) {

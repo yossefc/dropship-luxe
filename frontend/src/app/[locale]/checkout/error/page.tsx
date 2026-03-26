@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -13,13 +14,13 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// Error Page Component
+// Error Page Content (wrapped in Suspense)
 // ============================================================================
 
-export default function CheckoutErrorPage(): JSX.Element {
+function CheckoutErrorContent(): JSX.Element {
   const searchParams = useSearchParams();
-  const errorMessage = searchParams.get('errMsg') || searchParams.get('error');
-  const errorCode = searchParams.get('CCode') || searchParams.get('code');
+  const errorMessage = searchParams.get('errMsg') ?? searchParams.get('error');
+  const errorCode = searchParams.get('CCode') ?? searchParams.get('code');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
@@ -27,7 +28,7 @@ export default function CheckoutErrorPage(): JSX.Element {
       <header className="bg-primary-800 text-neutral-50 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link href="/" className="font-display text-2xl md:text-3xl text-center block">
-            Dropship Luxe
+            Hayoss
           </Link>
         </div>
       </header>
@@ -173,13 +174,29 @@ export default function CheckoutErrorPage(): JSX.Element {
           >
             <p className="text-sm text-neutral-600">
               Besoin d'aide ? Contactez notre service client à{' '}
-              <a href="mailto:support@dropship-luxe.com" className="text-accent-gold font-semibold hover:underline">
-                support@dropship-luxe.com
+              <a href="mailto:contact@hayoss.com" className="text-accent-gold font-semibold hover:underline">
+                contact@hayoss.com
               </a>
             </p>
           </motion.div>
         </motion.div>
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// Page Export with Suspense Boundary
+// ============================================================================
+
+export default function CheckoutErrorPage(): JSX.Element {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-800"></div>
+      </div>
+    }>
+      <CheckoutErrorContent />
+    </Suspense>
   );
 }

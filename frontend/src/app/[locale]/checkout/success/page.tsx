@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { motion } from 'framer-motion';
@@ -18,10 +18,10 @@ import {
 } from 'lucide-react';
 
 // ============================================================================
-// Success Page Component
+// Success Page Content (wrapped in Suspense)
 // ============================================================================
 
-export default function CheckoutSuccessPage(): JSX.Element {
+function CheckoutSuccessContent(): JSX.Element {
   const t = useTranslations('checkout');
   const searchParams = useSearchParams();
   const { clearCart } = useCartStore();
@@ -60,7 +60,7 @@ export default function CheckoutSuccessPage(): JSX.Element {
       <header className="bg-primary-800 text-neutral-50 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Link href="/" className="font-display text-2xl md:text-3xl text-center block">
-            Dropship Luxe
+            Hayoss
           </Link>
         </div>
       </header>
@@ -239,12 +239,28 @@ export default function CheckoutSuccessPage(): JSX.Element {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-sm">
             Des questions ? Contactez-nous à{' '}
-            <a href="mailto:support@dropship-luxe.com" className="text-accent-gold hover:underline">
-              support@dropship-luxe.com
+            <a href="mailto:contact@hayoss.com" className="text-accent-gold hover:underline">
+              contact@hayoss.com
             </a>
           </p>
         </div>
       </footer>
     </div>
+  );
+}
+
+// ============================================================================
+// Page Export with Suspense Boundary
+// ============================================================================
+
+export default function CheckoutSuccessPage(): JSX.Element {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-800"></div>
+      </div>
+    }>
+      <CheckoutSuccessContent />
+    </Suspense>
   );
 }
