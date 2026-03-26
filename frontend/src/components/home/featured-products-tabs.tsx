@@ -24,8 +24,8 @@ interface Product {
   image: string;
   hoverImage?: string;
   category: 'skincare' | 'makeup' | 'all';
-  badge?: 'new' | 'bestseller' | 'sale';
-  rating: number;
+  badge?: 'new' | 'bestseller' | 'sale' | 'limited';
+  rating?: number;
 }
 
 interface FeaturedProductsTabsProps {
@@ -309,9 +309,10 @@ function ProductCard({ product, index, locale, onAddToCart, className, isLarge }
               'absolute top-4 left-4 px-3 py-1 text-xs font-accent font-semibold tracking-wider uppercase rounded-full',
               product.badge === 'bestseller' && 'bg-accent-gold text-primary-800',
               product.badge === 'new' && 'bg-primary-800 text-white',
-              product.badge === 'sale' && 'bg-red-500 text-white'
+              product.badge === 'sale' && 'bg-red-500 text-white',
+              product.badge === 'limited' && 'bg-purple-600 text-white'
             )}>
-              {product.badge === 'sale' ? `-${discount}%` : product.badge}
+              {product.badge === 'sale' ? `-${discount}%` : product.badge === 'limited' ? 'Limited' : product.badge}
             </span>
           )}
 
