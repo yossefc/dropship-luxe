@@ -6,6 +6,9 @@ import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { BentoContainer, BentoImageCell, BentoTextCell } from '@/components/home/bento-grid';
 import { ProductCard, type ProductCardData } from '@/components/home/product-card';
+import { HeroSection } from '@/components/home/hero-section';
+import { LogoCarousel } from '@/components/home/logo-carousel';
+import { FeaturedProductsTabs } from '@/components/home/featured-products-tabs';
 import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/lib/store/cart-store';
 import { Link } from '@/i18n/routing';
@@ -172,88 +175,40 @@ export default function HomePage(): JSX.Element {
   }, []);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-white">
       {/* Navigation - Luxe Mega Menu */}
       <LuxeNavbar />
 
-      {/* Hero Section */}
-      <section className="pt-8 pb-16">
-        <BentoContainer layout="hero" className="min-h-[70vh]">
-          <BentoImageCell
-            src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=1200&h=1600&fit=crop"
-            alt={t('home.hero.title')}
-            title={t('home.hero.title')}
-            subtitle={t('home.hero.overline')}
-            href="/collections/spring"
-            span="featured"
-            priority
-          />
-          <BentoImageCell
-            src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&h=800&fit=crop"
-            alt={t('common.nav.skincare')}
-            title={t('common.nav.skincare')}
-            href="/collections/skincare"
-          />
-          <BentoTextCell
-            title={t('home.philosophy.title')}
-            description={t('home.philosophy.description')}
-            overline={t('home.philosophy.overline')}
-            cta={{ label: t('common.cta.learnMore'), href: '/about' }}
-            variant="dark"
-          />
-        </BentoContainer>
-      </section>
+      {/* Hero Section with Video */}
+      <HeroSection
+        title={t('home.hero.title')}
+        subtitle={t('home.hero.overline')}
+        ctaText={t('common.cta.shopNow')}
+        ctaHref="/collections"
+        secondaryCtaText={t('common.cta.learnMore')}
+        secondaryCtaHref="/about"
+      />
 
-      {/* Featured Products */}
-      <section className="py-section">
-        <div className="max-w-[1440px] mx-auto px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="text-center mb-12"
-          >
-            <span className="text-overline">{t('home.featured.overline')}</span>
-            <h2 className="font-display text-4xl md:text-5xl font-light mt-3">
-              {t('home.featured.title')}
-            </h2>
-          </motion.div>
+      {/* Logo Carousel - Press & Certifications */}
+      <LogoCarousel title="As Featured In" />
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {loading ? (
-              <div className="col-span-full flex justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-accent-gold" />
-              </div>
-            ) : (
-              products.map((product, index) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  index={index}
-                  onAddToCart={(p) => {
-                    useCartStore.getState().addItem({
-                      productId: p.id,
-                      name: p.name,
-                      brand: p.brand,
-                      image: p.image,
-                      price: p.price,
-                    });
-                  }}
-                />
-              ))
-            )}
+      {/* Featured Products with Tabs */}
+      {loading ? (
+        <section className="py-20">
+          <div className="flex justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-accent-gold" />
           </div>
-
-          <div className="text-center mt-12">
-            <Button variant="secondary" size="lg" asChild>
-              <Link href="/collections">
-                {t('common.cta.viewCollection')}
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <FeaturedProductsTabs
+          title={t('home.featured.title')}
+          subtitle={t('home.featured.overline')}
+          products={products.map((p, i) => ({
+            ...p,
+            category: i % 2 === 0 ? 'skincare' : 'makeup',
+          }))}
+        />
+      )}
 
       {/* Categories Bento */}
       <section className="py-section bg-neutral-100">
