@@ -28,7 +28,34 @@ async function main() {
     },
   });
 
-  console.log('Categories created');
+  const bodyCareCategory = await prisma.category.upsert({
+    where: { slug: 'body-care' },
+    update: {},
+    create: {
+      name: 'Body Care',
+      slug: 'body-care',
+      sortOrder: 3,
+      isActive: true,
+    },
+  });
+
+  const beautyToolsCategory = await prisma.category.upsert({
+    where: { slug: 'beauty-tools' },
+    update: {},
+    create: {
+      name: 'Beauty Tools',
+      slug: 'beauty-tools',
+      sortOrder: 4,
+      isActive: true,
+    },
+  });
+
+  console.log('Categories created:', {
+    skincare: skincareCategory.id,
+    makeup: makeupCategory.id,
+    bodyCare: bodyCareCategory.id,
+    beautyTools: beautyToolsCategory.id,
+  });
 
   // Sample products data
   const productsData = [

@@ -42,20 +42,20 @@ export async function generateMetadata({
     de: ['Schönheit', 'Luxus', 'Kosmetik', 'Hautpflege', 'Make-up', 'Gesichtspflege'],
   };
 
-  const currentLocale = locale as Locale;
+  const currentLocale = locales.includes(locale as Locale) ? (locale as Locale) : 'fr';
   const seoConfig = localeSeoConfig[currentLocale];
 
   return {
     title: {
       default: titles[currentLocale],
-      template: `%s | Dropship Luxe`,
+      template: `%s | Hayoss`,
     },
     description: descriptions[currentLocale],
     keywords: keywords[currentLocale],
     openGraph: {
       title: titles[currentLocale],
       description: descriptions[currentLocale],
-      locale: seoConfig.hreflang,
+      locale: seoConfig?.hreflang || 'fr-FR',
       type: 'website',
     },
     alternates: {

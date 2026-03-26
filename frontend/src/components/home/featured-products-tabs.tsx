@@ -274,8 +274,8 @@ function ProductCard({ product, index, locale, onAddToCart, className, isLarge }
     >
       <Link href={`/${locale}/products/${product.slug}`} className="block">
         <div className={cn(
-          'relative overflow-hidden rounded-2xl bg-neutral-100',
-          isLarge ? 'aspect-[3/4] md:aspect-square' : 'aspect-[3/4]'
+          'relative overflow-hidden rounded-xl bg-neutral-100',
+          isLarge ? 'aspect-[4/5] md:aspect-[3/4]' : 'aspect-[4/5]'
         )}>
           {/* Main Image */}
           <Image

@@ -168,8 +168,8 @@ export function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
           >
             {/* Header */}
             <div className="flex items-center justify-between h-[72px] px-6 border-b border-[#E8E4DF]">
-              <Link href="/" onClick={onClose} className="font-display text-2xl text-[#2D2926]">
-                Dropship Luxe
+              <Link href="/" onClick={onClose} className="font-serif text-2xl font-semibold text-[#2D2926]">
+                Hayoss
               </Link>
               <button
                 onClick={onClose}
@@ -234,10 +234,10 @@ export function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
                     Service client
                   </p>
                   <a
-                    href="mailto:contact@dropshipluxe.com"
+                    href="mailto:contact@hayoss.com"
                     className="text-[#B8927A] font-accent hover:underline"
                   >
-                    contact@dropshipluxe.com
+                    contact@hayoss.com
                   </a>
                 </div>
               </div>

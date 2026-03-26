@@ -60,7 +60,7 @@ export function HeroSection({
   };
 
   return (
-    <section className="relative h-screen min-h-[700px] max-h-[900px] overflow-hidden">
+    <section className="relative h-[50vh] min-h-[400px] max-h-[500px] overflow-hidden">
       {/* Video Background */}
       <div className="absolute inset-0">
         <video
@@ -93,7 +93,7 @@ export function HeroSection({
       </div>
 
       {/* Content */}
-      <div className="relative h-full max-w-[1440px] mx-auto px-6 flex flex-col justify-end pb-24 md:pb-32">
+      <div className="relative h-full max-w-7xl mx-auto px-6 flex flex-col justify-end pb-12 md:pb-16">
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
@@ -115,7 +115,7 @@ export function HeroSection({
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="font-display text-4xl md:text-6xl lg:text-7xl font-light text-white leading-[1.1] mb-6"
+            className="font-display text-3xl md:text-4xl lg:text-5xl font-light text-white leading-[1.1] mb-4"
           >
             {title}
           </motion.h1>

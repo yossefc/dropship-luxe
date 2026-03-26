@@ -504,8 +504,8 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // Admin Settings (in-memory, should be persisted in production)
   let adminSettings: AdminSettings = {
     priceMultiplier: 2.5,
-    minProductScore: 65,
-    quarantineThreshold: 50,
+    minProductScore: 45, // Lowered from 65 to accept more products
+    quarantineThreshold: 40, // Lowered from 50
     autoImportEnabled: false,
   };
 
@@ -582,9 +582,9 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // POST /api/admin/imports/run - Trigger manual import
   app.post('/api/admin/imports/run', adminAuth, async (req, res) => {
     try {
-      const { feedName, maxProducts, dryRun } = req.body;
+      const { feedName, maxProducts, dryRun, page } = req.body;
 
-      logger.info('Manual import triggered', { feedName, maxProducts, dryRun });
+      logger.info('Manual import triggered', { feedName, maxProducts, dryRun, page });
 
       // Run import asynchronously
       res.json({ status: 'started', message: 'Import job started' });
@@ -596,6 +596,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
         quarantineThreshold: adminSettings.quarantineThreshold,
         priceMultiplier: adminSettings.priceMultiplier,
         dryRun: dryRun ?? false,
+        page: page ?? 1,
       });
 
       logger.info('Manual import completed', { result: lastImportResult });

@@ -64,22 +64,37 @@ export interface ImportJobConfig {
   filterCosmetics?: boolean; // Only import cosmetics products
   useBeautyCategory?: boolean; // Search in Beauty & Health category (recommended for cosmetics)
   searchKeywords?: string; // Custom search keywords
+  page?: number; // Page number for pagination
 }
 
 // Cosmetics-related keywords for filtering
 const COSMETICS_KEYWORDS = [
-  // English
+  // Skincare
   'serum', 'cream', 'moisturizer', 'lotion', 'mask', 'cleanser', 'toner',
-  'skincare', 'skin care', 'beauty', 'cosmetic', 'makeup', 'make-up', 'lipstick',
-  'foundation', 'concealer', 'mascara', 'eyeliner', 'eyeshadow', 'blush',
-  'bronzer', 'primer', 'powder', 'facial', 'face', 'anti-aging', 'anti-wrinkle',
+  'skincare', 'skin care', 'facial', 'face', 'anti-aging', 'anti-wrinkle',
   'moisturizing', 'hydrating', 'vitamin c', 'retinol', 'hyaluronic', 'collagen',
-  'sunscreen', 'spf', 'lip balm', 'lip gloss', 'perfume', 'fragrance',
-  'essence', 'ampoule', 'eye cream', 'night cream', 'day cream', 'bb cream',
-  'cc cream', 'sheet mask', 'peel', 'exfoliant', 'scrub', 'oil', 'body lotion',
+  'sunscreen', 'spf', 'essence', 'ampoule', 'eye cream', 'night cream', 'day cream',
+  'bb cream', 'cc cream', 'sheet mask', 'peel', 'exfoliant', 'scrub', 'body lotion',
+  // Makeup
+  'beauty', 'cosmetic', 'makeup', 'make-up', 'lipstick', 'lip gloss', 'lip tint',
+  'foundation', 'concealer', 'mascara', 'eyeliner', 'eyeshadow', 'blush',
+  'bronzer', 'primer', 'powder', 'highlighter', 'contour', 'brow', 'eyebrow',
+  'lip balm', 'lipliner', 'lipgloss', 'rouge', 'palette',
+  // Nails - IMPORTANT: Include nail products
+  'nail', 'nail polish', 'gel nail', 'manicure', 'pedicure', 'nail art',
+  'gel polish', 'nail gel', 'nail varnish', 'false nail', 'fake nail', 'press on nail',
+  // Eyelashes - IMPORTANT: Include lash products
+  'eyelash', 'lash', 'lashes', 'false lash', 'fake lash', 'lash extension',
+  'eyelash extension', 'lash glue', 'eyelash glue', 'premade fan', 'volume lash',
+  // Hair & Body
+  'perfume', 'fragrance', 'cologne', 'body mist', 'hair', 'shampoo', 'conditioner',
+  'oil', 'body oil', 'face oil', 'hair oil', 'body scrub', 'bath', 'shower gel',
+  // Tools
+  'makeup brush', 'beauty sponge', 'blender', 'puff', 'applicator', 'beauty tool',
+  'curler', 'tweezers', 'mirror', 'organizer', 'cotton pad',
   // French
   'sérum', 'crème', 'soin', 'visage', 'peau', 'beauté', 'maquillage',
-  'hydratant', 'anti-âge', 'anti-rides', 'lèvres', 'yeux', 'teint',
+  'hydratant', 'anti-âge', 'anti-rides', 'lèvres', 'yeux', 'teint', 'vernis', 'ongle',
   // Product types
   'skincare set', 'beauty set', 'cosmetic set', 'gift set',
 ];
@@ -228,13 +243,14 @@ export class ProductImportJob {
     const {
       feedName = 'DS_France_topsellers',
       maxProducts = 20,
-      minScore = 65,
-      quarantineThreshold = 50,
+      minScore = 45, // Lowered from 65 to accept more products
+      quarantineThreshold = 40, // Lowered from 50
       priceMultiplier = 2.5,
       dryRun = false,
       filterCosmetics = true, // Filter cosmetics by default
       useBeautyCategory = true, // Use Beauty & Health category by default
-      searchKeywords = 'skincare serum cream moisturizer',
+      searchKeywords = 'skincare serum cream moisturizer lipstick nail polish eyelash',
+      page = 1, // Page number for pagination
     } = config;
 
     console.log(`[ProductImport] Starting job ${jobId}`, {
@@ -247,6 +263,7 @@ export class ProductImportJob {
       filterCosmetics,
       useBeautyCategory,
       searchKeywords,
+      page,
     });
 
     const result: ImportJobResult = {
@@ -267,11 +284,12 @@ export class ProductImportJob {
       let feedProducts: DSProductDetails[];
 
       if (useBeautyCategory && this.dsAdapter) {
-        console.log(`[ProductImport] Searching Beauty & Health category with keywords: ${searchKeywords}`);
+        console.log(`[ProductImport] Searching Beauty & Health category with keywords: ${searchKeywords}, page: ${page}`);
         const searchResult = await this.dsAdapter.searchProductsDetailed({
           keywords: searchKeywords,
           categoryId: '66', // Beauty & Health
           pageSize: Math.min(maxProducts, 50),
+          page,
         });
 
         // Convert search results to feed product format
@@ -590,9 +608,22 @@ export class ProductImportJob {
     const basePrice = parseFloat(skuInfo?.sku_price ?? skuInfo?.offer_sale_price ?? '0');
     const sellingPrice = (basePrice + shippingCost) * priceMultiplier;
 
-    await this.prisma.productQuarantine.create({
-      data: {
-        aliexpressId: String(baseInfo?.product_id ?? ''),
+    const aliexpressId = String(baseInfo?.product_id ?? '');
+    await this.prisma.productQuarantine.upsert({
+      where: { aliexpressId },
+      update: {
+        title: baseInfo?.subject ?? 'Unknown',
+        score: score.total,
+        reason: score.riskFactors.join(', ') || 'Score below threshold',
+        productData: productData as unknown as object,
+        shippingCost,
+        suggestedPrice: sellingPrice,
+        scoreBreakdown: score.breakdown,
+        riskFactors: score.riskFactors,
+        status: QuarantineStatus.pending,
+      },
+      create: {
+        aliexpressId,
         title: baseInfo?.subject ?? 'Unknown',
         score: score.total,
         reason: score.riskFactors.join(', ') || 'Score below threshold',

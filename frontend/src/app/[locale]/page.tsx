@@ -13,103 +13,24 @@ import { Button } from '@/components/ui/button';
 import { useCartStore } from '@/lib/store/cart-store';
 import { Link } from '@/i18n/routing';
 import { LuxeNavbar } from '@/components/navigation';
+import { getFeaturedProducts } from '@/data/fallback-products';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
 
-// Fallback products si l'API n'est pas disponible
-const fallbackProducts: ProductCardData[] = [
-  {
-    id: '1',
-    slug: 'serum-eclat-vitamine-c',
-    name: 'Sérum Éclat Vitamine C',
-    brand: 'Hayoss',
-    price: 89,
-    originalPrice: 119,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=800&fit=crop',
-    hoverImage: 'https://images.unsplash.com/photo-1617897903246-719242758050?w=600&h=800&fit=crop',
-    badge: 'bestseller',
-    rating: 4.8,
-  },
-  {
-    id: '2',
-    slug: 'creme-nuit-regenerante',
-    name: 'Crème Nuit Régénérante',
-    brand: 'Hayoss',
-    price: 125,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=600&h=800&fit=crop',
-    badge: 'new',
-    rating: 4.9,
-  },
-  {
-    id: '3',
-    slug: 'huile-visage-rose-musquee',
-    name: 'Huile Visage Rose Musquée',
-    brand: 'Hayoss',
-    price: 75,
-    originalPrice: 95,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=600&h=800&fit=crop',
-    hoverImage: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=600&h=800&fit=crop',
-    rating: 4.7,
-  },
-  {
-    id: '4',
-    slug: 'masque-hydratant-aloe',
-    name: 'Masque Hydratant Aloe Vera',
-    brand: 'Hayoss',
-    price: 45,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=600&h=800&fit=crop',
-    badge: 'new',
-    rating: 4.6,
-  },
-  {
-    id: '5',
-    slug: 'lotion-tonique-purifiante',
-    name: 'Lotion Tonique Purifiante',
-    brand: 'Hayoss',
-    price: 55,
-    originalPrice: 70,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1570194065650-d99fb4b38b15?w=600&h=800&fit=crop',
-    rating: 4.5,
-  },
-  {
-    id: '6',
-    slug: 'creme-contour-yeux',
-    name: 'Crème Contour des Yeux',
-    brand: 'Hayoss',
-    price: 98,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?w=600&h=800&fit=crop',
-    badge: 'bestseller',
-    rating: 4.9,
-  },
-  {
-    id: '7',
-    slug: 'gommage-doux-visage',
-    name: 'Gommage Doux Visage',
-    brand: 'Hayoss',
-    price: 42,
-    originalPrice: 55,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1598452963314-b09f397a5c48?w=600&h=800&fit=crop',
-    rating: 4.4,
-  },
-  {
-    id: '8',
-    slug: 'baume-levres-nourrissant',
-    name: 'Baume Lèvres Nourrissant',
-    brand: 'Hayoss',
-    price: 28,
-    currency: 'EUR',
-    image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=600&h=800&fit=crop',
-    badge: 'new',
-    rating: 4.8,
-  },
-];
+// Get featured products from comprehensive fallback data (105 products)
+const fallbackProducts: ProductCardData[] = getFeaturedProducts(12).map(p => ({
+  id: p.id,
+  slug: p.slug,
+  name: p.name,
+  brand: p.brand,
+  price: p.price,
+  originalPrice: p.originalPrice,
+  currency: p.currency,
+  image: p.image,
+  hoverImage: p.hoverImage,
+  badge: p.badge,
+  rating: p.rating,
+}));
 
 interface ApiProduct {
   id: string;
