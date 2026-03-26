@@ -767,6 +767,29 @@ export async function bootstrap(): Promise<BootstrapResult> {
     }
   });
 
+  // DELETE /api/admin/products/:id - Delete a specific product
+  app.delete('/api/admin/products/:id', adminAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Delete translations first
+      await prisma.productTranslation.deleteMany({
+        where: { productId: id },
+      });
+
+      // Delete product
+      const deleted = await prisma.product.delete({
+        where: { id },
+      });
+
+      logger.info('Product deleted', { id, name: deleted.name });
+      res.json({ success: true, deleted: { id: deleted.id, name: deleted.name } });
+    } catch (error) {
+      logger.error('Failed to delete product', { error, id: req.params.id });
+      res.status(500).json({ error: 'Failed to delete product' });
+    }
+  });
+
   // DELETE /api/admin/products/cleanup - Delete non-cosmetics products
   app.delete('/api/admin/products/cleanup', adminAuth, async (req, res) => {
     try {
