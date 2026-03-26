@@ -10,7 +10,7 @@
 
 import cron from 'node-cron';
 import { PrismaClient, SupplierOrderStatus, OrderStatus } from '@prisma/client';
-import { AliExpressAdapter, AliExpressConfig } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
+import { AliExpressDSAdapter, AliExpressDSConfig } from '@infrastructure/adapters/outbound/external-apis/aliexpress-ds.adapter.js';
 import { createLogger } from '@infrastructure/config/logger.js';
 
 // Create a logger instance for this job
@@ -54,16 +54,16 @@ export class TrackingSyncJob {
   private cronJob: cron.ScheduledTask | null = null;
   private isRunning = false;
   private readonly prisma: PrismaClient;
-  private readonly aliexpress: AliExpressAdapter;
+  private readonly aliexpress: AliExpressDSAdapter;
   private readonly config: TrackingSyncConfig;
 
   constructor(
     prisma: PrismaClient,
-    aliexpressConfig: AliExpressConfig,
+    aliexpressConfig: AliExpressDSConfig,
     config?: Partial<TrackingSyncConfig>
   ) {
     this.prisma = prisma;
-    this.aliexpress = new AliExpressAdapter(aliexpressConfig);
+    this.aliexpress = new AliExpressDSAdapter(aliexpressConfig);
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
@@ -365,7 +365,7 @@ export class TrackingSyncJob {
     if (!trackingNumber) return null;
 
     const carrier = this.detectCarrier(trackingNumber);
-    const template = CARRIER_TRACKING_URLS[carrier] ?? CARRIER_TRACKING_URLS['default'];
+    const template = CARRIER_TRACKING_URLS[carrier] ?? CARRIER_TRACKING_URLS['default'] ?? 'https://track.aftership.com/{tracking}';
 
     return template.replace('{tracking}', encodeURIComponent(trackingNumber));
   }
@@ -382,9 +382,8 @@ export class TrackingSyncJob {
 
     // Determine aggregate status
     const allDelivered = supplierOrders.every(o => o.status === SupplierOrderStatus.delivered);
-    const anyShipped = supplierOrders.some(o =>
-      [SupplierOrderStatus.shipped, SupplierOrderStatus.in_transit, SupplierOrderStatus.delivered].includes(o.status)
-    );
+    const shippedStatuses: SupplierOrderStatus[] = [SupplierOrderStatus.shipped, SupplierOrderStatus.in_transit, SupplierOrderStatus.delivered];
+    const anyShipped = supplierOrders.some(o => shippedStatuses.includes(o.status));
 
     let orderStatus: OrderStatus | null = null;
     const updateData: { status?: OrderStatus; shippedAt?: Date; deliveredAt?: Date } = {};
@@ -463,7 +462,7 @@ export interface TrackingSyncResult {
 
 export function createTrackingSyncJob(
   prisma: PrismaClient,
-  aliexpressConfig: AliExpressConfig,
+  aliexpressConfig: AliExpressDSConfig,
   config?: Partial<TrackingSyncConfig>
 ): TrackingSyncJob {
   return new TrackingSyncJob(prisma, aliexpressConfig, config);

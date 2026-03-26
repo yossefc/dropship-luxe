@@ -398,18 +398,21 @@ export class EmailAdapter {
 // ============================================================================
 
 export function createEmailAdapter(prisma: PrismaClient): EmailAdapter {
+  // Build config object with only defined properties
   const config: EmailConfig = {
     provider: (process.env.EMAIL_PROVIDER as 'smtp' | 'sendgrid' | 'mailgun') ?? 'smtp',
     from: process.env.EMAIL_FROM ?? 'noreply@dropship-luxe.com',
     fromName: process.env.EMAIL_FROM_NAME ?? 'Dropship Luxe',
-    smtpHost: process.env.SMTP_HOST,
-    smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : undefined,
-    smtpUser: process.env.SMTP_USER,
-    smtpPassword: process.env.SMTP_PASSWORD,
     smtpSecure: process.env.SMTP_SECURE === 'true',
-    apiKey: process.env.EMAIL_API_KEY,
-    domain: process.env.EMAIL_DOMAIN,
   };
+
+  // Only add optional properties if they have values
+  if (process.env.SMTP_HOST) config.smtpHost = process.env.SMTP_HOST;
+  if (process.env.SMTP_PORT) config.smtpPort = parseInt(process.env.SMTP_PORT);
+  if (process.env.SMTP_USER) config.smtpUser = process.env.SMTP_USER;
+  if (process.env.SMTP_PASSWORD) config.smtpPassword = process.env.SMTP_PASSWORD;
+  if (process.env.EMAIL_API_KEY) config.apiKey = process.env.EMAIL_API_KEY;
+  if (process.env.EMAIL_DOMAIN) config.domain = process.env.EMAIL_DOMAIN;
 
   return new EmailAdapter(config, prisma);
 }

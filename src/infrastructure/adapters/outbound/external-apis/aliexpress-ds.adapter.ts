@@ -15,6 +15,140 @@
 import axios, { AxiosInstance } from 'axios';
 import crypto from 'crypto';
 import { ExternalServiceError } from '@shared/errors/domain-error.js';
+import { Money } from '@domain/value-objects/money.js';
+import { Address } from '@domain/value-objects/address.js';
+import {
+  SupplierApi,
+  SupplierProduct,
+  SupplierOrderItem,
+  SupplierOrderResult,
+  SupplierOrderTracking,
+  SearchProductsParams,
+} from '@domain/ports/outbound/supplier-api.port.js';
+import {
+  AliExpressProductData,
+  ShippingCostParams,
+  ShippingCostResult,
+  ProductAttribute,
+  ProductVariant,
+  ShippingMethod,
+} from '@domain/ports/outbound/aliexpress.port.js';
+import {
+  ProductScoreCalculator,
+  ProductScoreInput,
+  ProductScoreResult,
+} from '@domain/services/product-score-calculator.js';
+
+// ============================================================================
+// Beauty & Cosmetics Category Filtering (STRICT)
+// ============================================================================
+
+/**
+ * AliExpress Beauty & Health main category ID
+ * Sub-categories: 3001 (Makeup), 3002 (Skin Care), 3003 (Hair Care), 3004 (Nail Art)
+ */
+const BEAUTY_HEALTH_CATEGORY_ID = '66';
+
+const ALLOWED_COSMETIC_CATEGORY_IDS = [
+  '66',    // Beauty & Health (main)
+  '3001',  // Makeup
+  '3002',  // Skin Care
+  '3003',  // Hair Care
+  '3004',  // Nail Art
+  '3005',  // Beauty Tools
+  '3006',  // Fragrances
+  '100003109', // Health & Beauty (alternative ID)
+];
+
+/**
+ * Keywords that MUST be present in product title or category for validation
+ * Products without any of these keywords will be REJECTED
+ */
+const COSMETIC_VALIDATION_KEYWORDS = [
+  // Skincare
+  'serum', 'cream', 'moisturizer', 'cleanser', 'toner', 'mask', 'lotion',
+  'sunscreen', 'spf', 'skincare', 'face', 'facial', 'eye cream', 'lip',
+  'hyaluronic', 'vitamin c', 'retinol', 'collagen', 'anti-aging',
+  // Makeup
+  'lipstick', 'lip gloss', 'mascara', 'eyeliner', 'eyeshadow', 'foundation',
+  'blush', 'concealer', 'primer', 'powder', 'highlighter', 'contour',
+  'brow', 'makeup', 'cosmetic', 'beauty',
+  // Hair
+  'hair', 'shampoo', 'conditioner', 'hair mask', 'hair oil', 'hair serum',
+  // Nails
+  'nail', 'polish', 'gel nail', 'manicure', 'pedicure',
+  // Tools
+  'brush', 'sponge', 'blender', 'roller', 'gua sha', 'mirror',
+  'organizer', 'curler', 'tweezers',
+  // Body
+  'body lotion', 'body cream', 'body scrub', 'shower', 'bath',
+  'hand cream', 'foot cream',
+  // Fragrance
+  'perfume', 'fragrance', 'cologne', 'body mist', 'eau de',
+];
+
+/**
+ * Keywords that indicate NON-cosmetic products - REJECT these
+ */
+const FORBIDDEN_PRODUCT_KEYWORDS = [
+  'phone', 'case', 'cable', 'charger', 'electronic', 'gadget',
+  'toy', 'game', 'tool', 'hardware', 'car', 'auto', 'motor',
+  'sport', 'fitness', 'gym', 'outdoor', 'camping',
+  'kitchen', 'cooking', 'food', 'drink',
+  'clothing', 'shirt', 'pants', 'dress', 'shoe', 'bag',
+  'jewelry', 'watch', 'ring', 'necklace', 'bracelet', 'earring',
+  'home', 'furniture', 'decor', 'garden',
+  'pet', 'dog', 'cat', 'animal',
+  'baby', 'kid', 'child', 'infant',
+  'office', 'stationery', 'book',
+];
+
+/**
+ * Validates if a product belongs to the beauty/cosmetics niche
+ * @returns { valid: boolean, reason: string }
+ */
+export function validateCosmeticProduct(
+  title: string,
+  categoryId: string,
+  categoryName: string
+): { valid: boolean; reason: string } {
+  const titleLower = title.toLowerCase();
+  const categoryLower = categoryName.toLowerCase();
+
+  // Check for forbidden keywords first (strict rejection)
+  for (const forbidden of FORBIDDEN_PRODUCT_KEYWORDS) {
+    if (titleLower.includes(forbidden)) {
+      return {
+        valid: false,
+        reason: `Produit rejeté: contient le mot-clé interdit "${forbidden}"`,
+      };
+    }
+  }
+
+  // Check if category is in allowed list
+  const categoryValid = ALLOWED_COSMETIC_CATEGORY_IDS.includes(categoryId);
+
+  // Check if title or category contains cosmetic keywords
+  const hasValidKeyword = COSMETIC_VALIDATION_KEYWORDS.some(
+    keyword => titleLower.includes(keyword) || categoryLower.includes(keyword)
+  );
+
+  if (!categoryValid && !hasValidKeyword) {
+    return {
+      valid: false,
+      reason: `Produit rejeté: catégorie "${categoryName}" (${categoryId}) non autorisée et aucun mot-clé cosmétique trouvé`,
+    };
+  }
+
+  if (!hasValidKeyword) {
+    return {
+      valid: false,
+      reason: `Produit rejeté: aucun mot-clé cosmétique/beauté trouvé dans le titre`,
+    };
+  }
+
+  return { valid: true, reason: 'Produit validé pour la niche cosmétique' };
+}
 
 // ============================================================================
 // Configuration
@@ -27,7 +161,14 @@ export interface AliExpressDSConfig {
   getAccessToken: () => Promise<string>;
   /** Gateway URL - defaults to Singapore gateway */
   gatewayUrl?: string;
+  /** Tracking ID for affiliate programs (optional) */
+  trackingId?: string;
 }
+
+/**
+ * Legacy config alias for backward compatibility
+ */
+export type AliExpressConfig = AliExpressDSConfig;
 
 // ============================================================================
 // API Response Types
@@ -152,17 +293,19 @@ export interface DSShippingInfo {
 }
 
 // ============================================================================
-// AliExpress DS Adapter
+// AliExpress DS Adapter - Implements SupplierApi
 // ============================================================================
 
-export class AliExpressDSAdapter {
+export class AliExpressDSAdapter implements SupplierApi {
   private readonly client: AxiosInstance;
   private readonly config: AliExpressDSConfig;
   private readonly gatewayUrl: string;
+  private readonly scoreCalculator: ProductScoreCalculator;
 
   constructor(config: AliExpressDSConfig) {
     this.config = config;
     this.gatewayUrl = config.gatewayUrl ?? 'https://api-sg.aliexpress.com/sync';
+    this.scoreCalculator = new ProductScoreCalculator();
 
     this.client = axios.create({
       baseURL: this.gatewayUrl,
@@ -310,7 +453,7 @@ export class AliExpressDSAdapter {
         // Check for method-level error
         // Note: rsp_code can be number (200) or string ("200") depending on the API method
         const rspCode = methodResponse.rsp_code;
-        const isSuccess = rspCode === 200 || rspCode === '200';
+        const isSuccess = rspCode === '200' || String(rspCode) === '200';
 
         if (rspCode && !isSuccess) {
           throw new ExternalServiceError(
@@ -565,6 +708,548 @@ export class AliExpressDSAdapter {
   }
 
   // ============================================================================
+  // SupplierApi Implementation
+  // ============================================================================
+
+  /**
+   * Search products (SupplierApi interface)
+   */
+  async searchProducts(params: SearchProductsParams): Promise<SupplierProduct[]> {
+    const result = await this.searchProductsDetailed({
+      keywords: params.query,
+      categoryId: params.category,
+      minPrice: params.minPrice,
+      maxPrice: params.maxPrice,
+      page: params.page,
+      pageSize: params.limit,
+    });
+
+    return result.products.map(p => this.mapToSupplierProduct(p));
+  }
+
+  /**
+   * Get product stock
+   */
+  async getProductStock(productId: string): Promise<number> {
+    try {
+      const product = await this.getProduct(productId);
+      const skuInfo = product.ae_item_sku_info_dtos?.ae_item_sku_info_d_t_o;
+      if (skuInfo && skuInfo.length > 0) {
+        const totalStock = skuInfo.reduce((sum, sku) => {
+          return sum + (sku.ipm_sku_stock ?? sku.sku_available_stock ?? sku.s_k_u_available_stock ?? 0);
+        }, 0);
+        return totalStock;
+      }
+      return 100; // Default assumption
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Get product price
+   */
+  async getProductPrice(productId: string): Promise<Money> {
+    const product = await this.getProduct(productId);
+    const skuInfo = product.ae_item_sku_info_dtos?.ae_item_sku_info_d_t_o?.[0];
+    const price = parseFloat(skuInfo?.sku_price ?? skuInfo?.offer_sale_price ?? '0');
+    return Money.create(price, 'EUR');
+  }
+
+  /**
+   * Place order (SupplierApi interface)
+   */
+  async placeOrder(
+    items: SupplierOrderItem[],
+    shippingAddress: Address
+  ): Promise<SupplierOrderResult> {
+    const result = await this.createOrder({
+      productItems: items.map(item => ({
+        productId: item.productId,
+        skuId: item.variantId,
+        quantity: item.quantity,
+      })),
+      logisticsAddress: {
+        contactPerson: shippingAddress.fullName,
+        address: shippingAddress.street,
+        city: shippingAddress.city,
+        province: shippingAddress.state,
+        country: shippingAddress.country,
+        postalCode: shippingAddress.postalCode,
+        mobileNo: shippingAddress.phone,
+      },
+    });
+
+    return {
+      orderId: result.order_id ?? result.order_list?.[0]?.order_id ?? '',
+      status: 'submitted',
+    };
+  }
+
+  /**
+   * Get order status (SupplierApi interface)
+   */
+  async getOrderStatus(orderId: string): Promise<SupplierOrderResult> {
+    const result = await this.getOrder(orderId);
+    return {
+      orderId: result.order_id ?? orderId,
+      status: result.order_status ?? 'unknown',
+    };
+  }
+
+  /**
+   * Get order tracking (SupplierApi interface)
+   */
+  async getOrderTracking(orderId: string): Promise<SupplierOrderTracking> {
+    const result = await this.getTrackingInfo(orderId);
+    return {
+      orderId,
+      status: result.tracking_available ? 'in_transit' : 'pending',
+      trackingNumber: orderId, // AliExpress uses orderId for tracking
+      events: (result.details ?? []).map(e => ({
+        date: new Date(e.event_date ?? Date.now()),
+        status: 'update',
+        description: e.event_desc ?? '',
+        ...(e.address ? { location: e.address } : {}),
+      })),
+    };
+  }
+
+  /**
+   * Cancel order (SupplierApi interface)
+   */
+  async cancelOrder(orderId: string): Promise<boolean> {
+    try {
+      await this.executeRequest('aliexpress.trade.order.cancel', {
+        order_id: orderId,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // ============================================================================
+  // Product Scoring & Evaluation Methods
+  // ============================================================================
+
+  /**
+   * Calculate product score for import decision
+   */
+  calculateProductScore(
+    product: AliExpressProductData,
+    shippingCost: number,
+    targetSellingPrice: number,
+    targetCountry: string
+  ): ProductScoreResult {
+    const input: ProductScoreInput = {
+      product,
+      shippingCost,
+      targetSellingPrice,
+      targetCountry,
+    };
+
+    return this.scoreCalculator.calculate(input);
+  }
+
+  /**
+   * Evaluate a product for import eligibility
+   * Returns score result and whether product should be imported
+   * IMPORTANT: Includes STRICT cosmetic niche validation
+   */
+  async evaluateProductForImport(
+    productId: string,
+    targetCountry: string,
+    pricingStrategy: {
+      markupMultiplier: number;
+      minimumMargin: number;
+    }
+  ): Promise<{
+    product: AliExpressProductData;
+    shippingCost: number;
+    suggestedPrice: number;
+    scoreResult: ProductScoreResult;
+    eligible: boolean;
+    reason: string;
+  }> {
+    // Fetch product details
+    const product = await this.getProductDetails(productId);
+
+    // ========================================================================
+    // GARDE-FOU COSMÉTIQUE: Validation STRICTE avant tout traitement
+    // ========================================================================
+    const cosmeticValidation = validateCosmeticProduct(
+      product.title,
+      product.categoryId,
+      product.categoryName
+    );
+
+    if (!cosmeticValidation.valid) {
+      // Return immediately with zero score - product is NOT in cosmetic niche
+      return {
+        product,
+        shippingCost: 0,
+        suggestedPrice: 0,
+        scoreResult: {
+          totalScore: 0,
+          breakdown: {
+            profitMarginScore: 0,
+            marketDemandScore: 0,
+            logisticsScore: 0,
+            complianceScore: 0,
+            supplierQualityScore: 0,
+            competitivenessScore: 0,
+          },
+          profitability: {
+            costPrice: product.price,
+            shippingCost: 0,
+            totalCost: product.price,
+            sellingPrice: 0,
+            grossProfit: 0,
+            profitMargin: 0,
+            breakEvenUnits: Infinity,
+          },
+          riskFactors: ['HORS_NICHE_COSMETIQUE: Produit rejeté - ne correspond pas à la niche beauté/cosmétique'],
+          shouldImport: false,
+          recommendation: 'NOT_RECOMMENDED',
+        },
+        eligible: false,
+        reason: cosmeticValidation.reason,
+      };
+    }
+    // ========================================================================
+
+    // Calculate shipping cost
+    const shippingResult = await this.calculateShippingCost({
+      productId,
+      quantity: 1,
+      countryCode: targetCountry,
+    });
+
+    const shippingCost = shippingResult.shippingCost;
+
+    // Calculate suggested selling price
+    const totalCost = product.price + shippingCost;
+    const suggestedPrice = Math.max(
+      totalCost * pricingStrategy.markupMultiplier,
+      totalCost / (1 - pricingStrategy.minimumMargin)
+    );
+
+    // Calculate score
+    const scoreResult = this.calculateProductScore(
+      product,
+      shippingCost,
+      suggestedPrice,
+      targetCountry
+    );
+
+    // Determine eligibility
+    let eligible = scoreResult.shouldImport;
+    let reason = '';
+
+    if (scoreResult.totalScore < 35) {
+      reason = `Score trop bas (${scoreResult.totalScore}/100) - Produit non recommandé`;
+      eligible = false;
+    } else if (scoreResult.totalScore < 50) {
+      reason = `Score risqué (${scoreResult.totalScore}/100) - Produit en quarantaine`;
+      eligible = false;
+    } else if (scoreResult.riskFactors.length >= 5) {
+      reason = `Trop de facteurs de risque (${scoreResult.riskFactors.length}) détectés`;
+      eligible = false;
+    } else if (scoreResult.totalScore < 65) {
+      reason = `Score acceptable (${scoreResult.totalScore}/100) - Import autorisé`;
+    } else if (scoreResult.recommendation === 'GOOD') {
+      reason = `Bon score (${scoreResult.totalScore}/100) - Import autorisé`;
+    } else {
+      reason = `Excellent score (${scoreResult.totalScore}/100) - Import prioritaire`;
+    }
+
+    return {
+      product,
+      shippingCost,
+      suggestedPrice: Math.ceil(suggestedPrice * 100) / 100,
+      scoreResult,
+      eligible,
+      reason,
+    };
+  }
+
+  /**
+   * Batch evaluate products and filter eligible ones
+   */
+  async batchEvaluateProducts(
+    productIds: string[],
+    targetCountry: string,
+    pricingStrategy: {
+      markupMultiplier: number;
+      minimumMargin: number;
+    }
+  ): Promise<{
+    eligible: Array<{
+      product: AliExpressProductData;
+      suggestedPrice: number;
+      score: number;
+    }>;
+    quarantine: Array<{
+      productId: string;
+      score: number;
+      reason: string;
+    }>;
+    rejected: Array<{
+      productId: string;
+      score: number;
+      reason: string;
+    }>;
+    stats: {
+      total: number;
+      eligibleCount: number;
+      quarantineCount: number;
+      rejectedCount: number;
+      averageScore: number;
+    };
+  }> {
+    const eligible: Array<{ product: AliExpressProductData; suggestedPrice: number; score: number }> = [];
+    const quarantine: Array<{ productId: string; score: number; reason: string }> = [];
+    const rejected: Array<{ productId: string; score: number; reason: string }> = [];
+    let totalScore = 0;
+
+    for (const productId of productIds) {
+      try {
+        const evaluation = await this.evaluateProductForImport(
+          productId,
+          targetCountry,
+          pricingStrategy
+        );
+
+        totalScore += evaluation.scoreResult.totalScore;
+
+        if (evaluation.eligible) {
+          eligible.push({
+            product: evaluation.product,
+            suggestedPrice: evaluation.suggestedPrice,
+            score: evaluation.scoreResult.totalScore,
+          });
+        } else if (evaluation.scoreResult.totalScore >= 35) {
+          quarantine.push({
+            productId,
+            score: evaluation.scoreResult.totalScore,
+            reason: evaluation.reason,
+          });
+        } else {
+          rejected.push({
+            productId,
+            score: evaluation.scoreResult.totalScore,
+            reason: evaluation.reason,
+          });
+        }
+      } catch (error) {
+        rejected.push({
+          productId,
+          score: 0,
+          reason: `Erreur lors de l'évaluation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
+      }
+    }
+
+    return {
+      eligible,
+      quarantine,
+      rejected,
+      stats: {
+        total: productIds.length,
+        eligibleCount: eligible.length,
+        quarantineCount: quarantine.length,
+        rejectedCount: rejected.length,
+        averageScore: productIds.length > 0 ? Math.round(totalScore / productIds.length) : 0,
+      },
+    };
+  }
+
+  /**
+   * Search products with full details
+   * IMPORTANT: Enforces Beauty & Health category filtering (niche cosmétique)
+   */
+  async searchProductsDetailed(params: {
+    keywords: string;
+    categoryId?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    minRating?: number;
+    page?: number;
+    pageSize?: number;
+  }): Promise<{
+    products: AliExpressProductData[];
+    totalCount: number;
+    currentPage: number;
+    totalPages: number;
+  }> {
+    // STRICT: Force Beauty & Health category if not already specified or if outside allowed list
+    const enforcedCategoryId = params.categoryId && ALLOWED_COSMETIC_CATEGORY_IDS.includes(params.categoryId)
+      ? params.categoryId
+      : BEAUTY_HEALTH_CATEGORY_ID;
+
+    // Use the DS recommended products API
+    const result = await this.executeRequest<{
+      products?: Array<{
+        product_id?: number;
+        product_title?: string;
+        sale_price?: string;
+        original_price?: string;
+        product_main_image_url?: string;
+        evaluate_rate?: string;
+        orders?: number;
+        ship_to_days?: string;
+        second_level_category_id?: number;
+        second_level_category_name?: string;
+      }>;
+      total_record_count?: number;
+      current_page_no?: number;
+      total_page_no?: number;
+    }>('aliexpress.ds.recommend.feed.get', {
+      category_id: enforcedCategoryId,
+      page_no: params.page ?? 1,
+      page_size: params.pageSize ?? 50,
+      target_currency: 'EUR',
+      target_language: 'EN',
+      sort: 'SALE_PRICE_ASC',
+    });
+
+    const rawProducts = result.products ?? [];
+
+    // Map and filter products
+    const products: AliExpressProductData[] = [];
+    for (const p of rawProducts) {
+      // Convert to AliExpressProductData format
+      const productData: AliExpressProductData = {
+        productId: String(p.product_id ?? ''),
+        title: p.product_title ?? '',
+        description: '',
+        descriptionHtml: '',
+        images: p.product_main_image_url ? [p.product_main_image_url] : [],
+        price: parseFloat(p.sale_price ?? '0'),
+        currency: 'EUR',
+        categoryId: String(p.second_level_category_id ?? enforcedCategoryId),
+        categoryName: p.second_level_category_name ?? 'Beauty & Health',
+        attributes: [],
+        variants: [],
+        stock: 100,
+        rating: this.parseRating(p.evaluate_rate),
+        reviewCount: 0,
+        orderCount: p.orders ?? 0,
+        supplierId: '',
+        supplierName: 'AliExpress Seller',
+        supplierRating: 4.5,
+        shippingInfo: {
+          methods: [],
+          minDays: 15,
+          maxDays: parseInt(p.ship_to_days ?? '45', 10),
+          defaultCost: 0,
+          freeShippingAvailable: true,
+        },
+        weight: 0.1,
+        dimensions: { length: 10, width: 10, height: 5 },
+      };
+
+      // Validate cosmetic niche
+      const validation = validateCosmeticProduct(
+        productData.title,
+        productData.categoryId,
+        productData.categoryName
+      );
+
+      if (validation.valid) {
+        products.push(productData);
+      }
+    }
+
+    return {
+      products,
+      totalCount: result.total_record_count ?? products.length,
+      currentPage: result.current_page_no ?? 1,
+      totalPages: result.total_page_no ?? 1,
+    };
+  }
+
+  /**
+   * Get detailed product data as AliExpressProductData
+   */
+  async getProductDetails(productId: string): Promise<AliExpressProductData> {
+    const product = await this.getProduct(productId);
+    return this.mapDSProductToAliExpressProductData(product);
+  }
+
+  /**
+   * Calculate shipping cost for a product
+   */
+  async calculateShippingCost(params: ShippingCostParams): Promise<ShippingCostResult> {
+    try {
+      const shippingOptions = await this.calculateShipping({
+        productId: params.productId,
+        quantity: params.quantity,
+        countryCode: params.countryCode,
+      });
+
+      const cheapestOption = shippingOptions
+        .filter(opt => !opt.error_code)
+        .sort((a, b) => parseFloat(a.freight ?? 'Infinity') - parseFloat(b.freight ?? 'Infinity'))[0];
+
+      if (!cheapestOption) {
+        return {
+          shippingCost: this.estimateShippingCost(params.countryCode),
+          currency: 'EUR',
+          estimatedDays: { min: 15, max: 45 },
+          carrier: 'AliExpress Standard',
+          trackable: true,
+        };
+      }
+
+      const deliveryDays = cheapestOption.estimated_delivery_time
+        ? parseInt(cheapestOption.estimated_delivery_time, 10)
+        : 30;
+
+      return {
+        shippingCost: parseFloat(cheapestOption.freight ?? '0'),
+        currency: cheapestOption.currency ?? 'EUR',
+        estimatedDays: { min: Math.max(deliveryDays - 10, 7), max: deliveryDays },
+        carrier: cheapestOption.service_name ?? 'AliExpress Standard',
+        trackable: cheapestOption.tracking_available === 'true',
+      };
+    } catch {
+      return {
+        shippingCost: this.estimateShippingCost(params.countryCode),
+        currency: 'EUR',
+        estimatedDays: { min: 15, max: 45 },
+        carrier: 'AliExpress Standard',
+        trackable: true,
+      };
+    }
+  }
+
+  /**
+   * Check product availability
+   */
+  async checkProductAvailability(productId: string): Promise<{
+    available: boolean;
+    stock: number;
+    price: number;
+  }> {
+    try {
+      const product = await this.getProductDetails(productId);
+      return {
+        available: product.stock > 0,
+        stock: product.stock,
+        price: product.price,
+      };
+    } catch {
+      return {
+        available: false,
+        stock: 0,
+        price: 0,
+      };
+    }
+  }
+
+  // ============================================================================
   // Debug / Raw API Methods
   // ============================================================================
 
@@ -662,16 +1347,25 @@ export class AliExpressDSAdapter {
       const baseInfo = product.ae_item_base_info_dto;
       const storeInfo = product.ae_store_info;
 
+      // Build product object with only defined properties
+      const productResult: {
+        id?: number;
+        title?: string;
+        status?: string;
+        storeId?: number;
+        storeName?: string;
+      } = {};
+
+      if (baseInfo?.product_id !== undefined) productResult.id = baseInfo.product_id;
+      if (baseInfo?.subject !== undefined) productResult.title = baseInfo.subject;
+      if (baseInfo?.product_status_type !== undefined) productResult.status = baseInfo.product_status_type;
+      if (storeInfo?.store_id !== undefined) productResult.storeId = storeInfo.store_id;
+      if (storeInfo?.store_name !== undefined) productResult.storeName = storeInfo.store_name;
+
       return {
         success: true,
         message: 'Product fetched successfully',
-        product: {
-          id: baseInfo?.product_id,
-          title: baseInfo?.subject,
-          status: baseInfo?.product_status_type,
-          storeId: storeInfo?.store_id,
-          storeName: storeInfo?.store_name,
-        },
+        product: productResult,
       };
     } catch (error) {
       return {
@@ -680,6 +1374,172 @@ export class AliExpressDSAdapter {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  // ============================================================================
+  // Private Helpers
+  // ============================================================================
+
+  /**
+   * Estimate shipping cost based on destination country
+   */
+  private estimateShippingCost(countryCode: string): number {
+    const shippingEstimates: Record<string, number> = {
+      FR: 2.50,
+      ES: 2.80,
+      IT: 2.80,
+      DE: 2.50,
+      GB: 3.50,
+      BE: 2.50,
+      NL: 2.50,
+      PT: 3.00,
+      AT: 2.80,
+      CH: 4.50,
+      US: 5.00,
+      CA: 5.00,
+    };
+
+    return shippingEstimates[countryCode] ?? 4.00;
+  }
+
+  /**
+   * Parse rating from percentage string
+   */
+  private parseRating(evaluateRate?: string): number {
+    if (!evaluateRate) return 4.0;
+    const percentage = parseFloat(evaluateRate.replace('%', ''));
+    // Convert percentage to 5-star rating
+    return Math.round((percentage / 20) * 10) / 10;
+  }
+
+  /**
+   * Map DS product to AliExpressProductData format
+   */
+  private mapDSProductToAliExpressProductData(product: DSProductDetails): AliExpressProductData {
+    const baseInfo = product.ae_item_base_info_dto;
+    const skuInfo = product.ae_item_sku_info_dtos?.ae_item_sku_info_d_t_o ?? [];
+    const mediaInfo = product.ae_multimedia_info_dto;
+    const storeInfo = product.ae_store_info;
+    const packageInfo = product.package_info_dto;
+    const logisticsInfo = product.logistics_info_dto;
+
+    // Parse images
+    const images: string[] = [];
+    if (mediaInfo?.image_urls) {
+      const urls = mediaInfo.image_urls.split(';').filter(Boolean);
+      images.push(...urls);
+    }
+
+    // Parse variants
+    const variants: ProductVariant[] = skuInfo.map(sku => ({
+      skuId: sku.sku_id ?? sku.id ?? '',
+      name: this.parseSkuName(sku.ae_sku_property_dtos?.ae_sku_property_d_t_o),
+      price: parseFloat(sku.offer_sale_price ?? sku.sku_price ?? '0'),
+      stock: sku.ipm_sku_stock ?? sku.sku_available_stock ?? sku.s_k_u_available_stock ?? 0,
+      attributes: this.parseSkuAttributes(sku.ae_sku_property_dtos?.ae_sku_property_d_t_o),
+      image: sku.ae_sku_property_dtos?.ae_sku_property_d_t_o?.find(p => p.sku_image)?.sku_image,
+    }));
+
+    // Calculate total stock
+    const totalStock = skuInfo.reduce((sum, sku) => {
+      return sum + (sku.ipm_sku_stock ?? sku.sku_available_stock ?? sku.s_k_u_available_stock ?? 0);
+    }, 0) || 100;
+
+    // Get base price
+    const basePrice = skuInfo[0]
+      ? parseFloat(skuInfo[0].offer_sale_price ?? skuInfo[0].sku_price ?? '0')
+      : 0;
+
+    return {
+      productId: String(baseInfo?.product_id ?? ''),
+      title: baseInfo?.subject ?? '',
+      description: baseInfo?.detail ?? '',
+      descriptionHtml: baseInfo?.mobile_detail ?? baseInfo?.detail ?? '',
+      images,
+      price: basePrice,
+      currency: baseInfo?.currency_code ?? 'EUR',
+      categoryId: String(baseInfo?.category_id ?? ''),
+      categoryName: 'Beauty & Health', // DS API doesn't return category name
+      attributes: [],
+      variants,
+      stock: totalStock,
+      rating: parseFloat(storeInfo?.item_as_described_rating ?? '4.5'),
+      reviewCount: 0,
+      orderCount: 0,
+      supplierId: String(storeInfo?.store_id ?? ''),
+      supplierName: storeInfo?.store_name ?? 'AliExpress Seller',
+      supplierRating: parseFloat(storeInfo?.shipping_speed_rating ?? '4.5'),
+      shippingInfo: {
+        methods: [],
+        minDays: 15,
+        maxDays: logisticsInfo?.delivery_time ?? 45,
+        defaultCost: 0,
+        freeShippingAvailable: true,
+      },
+      weight: parseFloat(packageInfo?.gross_weight ?? '0.1'),
+      dimensions: {
+        length: packageInfo?.package_length ?? 10,
+        width: packageInfo?.package_width ?? 10,
+        height: packageInfo?.package_height ?? 5,
+      },
+    };
+  }
+
+  /**
+   * Parse SKU name from properties
+   */
+  private parseSkuName(properties?: Array<{ sku_property_name?: string; property_value_definition_name?: string }>): string {
+    if (!properties) return '';
+    return properties
+      .map(p => p.property_value_definition_name ?? '')
+      .filter(Boolean)
+      .join(' / ');
+  }
+
+  /**
+   * Parse SKU attributes to record
+   */
+  private parseSkuAttributes(properties?: Array<{ sku_property_name?: string; property_value_definition_name?: string }>): Record<string, string> {
+    const result: Record<string, string> = {};
+    if (!properties) return result;
+
+    for (const prop of properties) {
+      if (prop.sku_property_name && prop.property_value_definition_name) {
+        result[prop.sku_property_name] = prop.property_value_definition_name;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Map to SupplierProduct interface
+   */
+  private mapToSupplierProduct(product: AliExpressProductData): SupplierProduct {
+    return {
+      id: product.productId,
+      name: product.title,
+      description: product.description,
+      category: product.categoryName,
+      images: product.images,
+      price: Money.create(product.price, 'EUR'),
+      stock: product.stock,
+      rating: product.rating,
+      orderVolume: product.orderCount,
+      supplierId: product.supplierId,
+      supplierName: product.supplierName,
+      shippingTime: {
+        min: product.shippingInfo.minDays,
+        max: product.shippingInfo.maxDays,
+      },
+      variants: product.variants.map(v => ({
+        id: v.skuId,
+        name: v.name,
+        price: Money.create(v.price, 'EUR'),
+        stock: v.stock,
+        attributes: v.attributes,
+      })),
+    };
   }
 }
 
@@ -703,3 +1563,12 @@ export function createAliExpressDSAdapter(
     getAccessToken,
   });
 }
+
+// ============================================================================
+// Backward Compatibility Aliases
+// ============================================================================
+
+/**
+ * Alias for backward compatibility with code using AliExpressAdapter
+ */
+export { AliExpressDSAdapter as AliExpressAdapter };

@@ -529,26 +529,28 @@ export class ProductImportJob {
     keywords: string[];
   }> {
     try {
-      const prompt = `Transform this product into luxury French cosmetics copy:
-
-Title: ${title}
-Description: ${description}
-
-Provide JSON with:
-- name: Elegant French product name (max 60 chars)
-- description: Luxurious French description (150-200 words)
-- benefits: Array of 3-4 key benefits in French
-- metaTitle: SEO title in French (max 60 chars)
-- metaDescription: SEO description in French (max 155 chars)
-- keywords: Array of 5-7 French SEO keywords`;
-
-      const result = await this.openai.generateCompletion({
-        prompt,
-        maxTokens: 1000,
-        temperature: 0.7,
+      // Use the OpenAI adapter's luxury translation feature
+      const result = await this.openai.generateLuxuryTranslations({
+        originalName: title,
+        originalDescription: description,
+        category: 'cosmetics',
+        targetLocales: ['fr'],
       });
 
-      return JSON.parse(result.text);
+      // Extract French translation
+      const frTranslation = result.translations.find(t => t.locale === 'fr');
+      if (frTranslation) {
+        return {
+          name: frTranslation.name,
+          description: frTranslation.description,
+          benefits: frTranslation.benefits,
+          metaTitle: frTranslation.metaTitle,
+          metaDescription: frTranslation.metaDescription,
+          keywords: frTranslation.metaKeywords,
+        };
+      }
+
+      throw new Error('No French translation generated');
     } catch (error) {
       console.warn('[ProductImport] AI generation failed, using fallback', error);
       // Fallback

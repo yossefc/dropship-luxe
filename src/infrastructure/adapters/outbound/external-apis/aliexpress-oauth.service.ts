@@ -231,9 +231,12 @@ export class AliExpressOAuthService {
         tokenType: data.token_type ?? 'Bearer',
         userId: data.seller_id ?? data.user_id ?? data.account_id ?? data.account ?? '',
         userNick: data.user_nick ?? '',
-        sellerAccountId: data.seller_id ?? data.account_id ?? data.sp,
-        scope: data.locale,
       };
+
+      // Only add optional properties if they have values
+      const sellerAccountId = data.seller_id ?? data.account_id ?? data.sp;
+      if (sellerAccountId !== undefined) tokenResponse.sellerAccountId = sellerAccountId;
+      if (data.locale !== undefined) tokenResponse.scope = data.locale;
 
       logger.info('Successfully obtained access token', {
         userId: tokenResponse.userId,
@@ -312,7 +315,7 @@ export class AliExpressOAuthService {
           ? new Date(now + data.refresh_expires_in * 1000)
         : new Date(now + 30 * 24 * 60 * 60 * 1000);
 
-      return {
+      const refreshedToken: TokenResponse = {
         accessToken: data.access_token,
         refreshToken: data.refresh_token ?? refreshToken,
         accessTokenExpiresAt,
@@ -320,8 +323,13 @@ export class AliExpressOAuthService {
         tokenType: data.token_type ?? 'Bearer',
         userId: data.seller_id ?? data.user_id ?? data.account_id ?? data.account ?? '',
         userNick: data.user_nick ?? '',
-        sellerAccountId: data.seller_id ?? data.account_id ?? data.sp,
       };
+
+      // Only add optional property if it has a value
+      const sellerAccountId = data.seller_id ?? data.account_id ?? data.sp;
+      if (sellerAccountId !== undefined) refreshedToken.sellerAccountId = sellerAccountId;
+
+      return refreshedToken;
     } catch (error) {
       if (error instanceof ExternalServiceError) {
         throw error;
@@ -357,6 +365,10 @@ export class AliExpressOAuthService {
       : null;
 
     // Upsert the credential
+    // Convert undefined to null for Prisma compatibility
+    const sellerAccountId = token.sellerAccountId ?? null;
+    const scope = token.scope ?? null;
+
     await this.prisma.aliExpressCredential.upsert({
       where: { name: credentialName },
       create: {
@@ -368,8 +380,8 @@ export class AliExpressOAuthService {
         refreshExpiresAt: token.refreshTokenExpiresAt,
         aliexpressUserId: token.userId,
         aliexpressUserNick: token.userNick,
-        sellerAccountId: token.sellerAccountId,
-        scope: token.scope,
+        sellerAccountId,
+        scope,
         isActive: true,
         lastRefreshedAt: new Date(),
       },
@@ -381,8 +393,8 @@ export class AliExpressOAuthService {
         refreshExpiresAt: token.refreshTokenExpiresAt,
         aliexpressUserId: token.userId,
         aliexpressUserNick: token.userNick,
-        sellerAccountId: token.sellerAccountId,
-        scope: token.scope,
+        sellerAccountId,
+        scope,
         isActive: true,
         lastError: null,
         lastRefreshedAt: new Date(),

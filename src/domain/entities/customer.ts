@@ -9,7 +9,7 @@ export interface CustomerProps {
   firstName: string;
   lastName: string;
   phone?: string;
-  stripeCustomerId?: string;
+  paymentCustomerId?: string;
   addresses: Address[];
   defaultAddressIndex: number;
   isVerified: boolean;
@@ -20,7 +20,7 @@ export interface CustomerProps {
 export class Customer {
   private constructor(private props: CustomerProps) {}
 
-  static create(props: Omit<CustomerProps, 'createdAt' | 'updatedAt' | 'addresses' | 'defaultAddressIndex' | 'isVerified' | 'stripeCustomerId'>): Customer {
+  static create(props: Omit<CustomerProps, 'createdAt' | 'updatedAt' | 'addresses' | 'defaultAddressIndex' | 'isVerified' | 'paymentCustomerId'>): Customer {
     if (props.firstName.trim().length === 0) {
       throw new ValidationError('First name is required');
     }
@@ -51,7 +51,7 @@ export class Customer {
   get lastName(): string { return this.props.lastName; }
   get fullName(): string { return `${this.props.firstName} ${this.props.lastName}`; }
   get phone(): string | undefined { return this.props.phone; }
-  get stripeCustomerId(): string | undefined { return this.props.stripeCustomerId; }
+  get paymentCustomerId(): string | undefined { return this.props.paymentCustomerId; }
   get addresses(): Address[] { return [...this.props.addresses]; }
   get defaultAddress(): Address | undefined {
     if (this.props.defaultAddressIndex >= 0 && this.props.defaultAddressIndex < this.props.addresses.length) {
@@ -63,8 +63,8 @@ export class Customer {
   get createdAt(): Date { return this.props.createdAt; }
   get updatedAt(): Date { return this.props.updatedAt; }
 
-  setStripeCustomerId(stripeCustomerId: string): void {
-    this.props.stripeCustomerId = stripeCustomerId;
+  setPaymentCustomerId(paymentCustomerId: string): void {
+    this.props.paymentCustomerId = paymentCustomerId;
     this.props.updatedAt = new Date();
   }
 

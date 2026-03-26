@@ -24,7 +24,13 @@
       "WebFetch(domain:www.aliexpress.com)",
       "Bash(more:*)",
       "Bash(timeout:*)",
-      "Bash(dir \"D:\\\\dropship-luxe\\\\frontend\\\\.env*\")"
+      "Bash(dir \"D:\\\\dropship-luxe\\\\frontend\\\\.env*\")",
+      "Bash(ls -la \"D:\\\\dropship-luxe\\\\src\\\\application\\\\use-cases\"\" | grep -i \"import|sync \")",
+      "Bash(ls -la \"D:\\\\dropship-luxe\\\\src\\\\infrastructure\\\\adapters\\\\outbound\\\\external-apis\"\" | grep -i \"aliexpress \")",
+      "Bash(npm run build)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

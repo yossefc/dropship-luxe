@@ -30,6 +30,117 @@ import {
   ProductScoreResult,
 } from '@domain/services/product-score-calculator.js';
 
+// ============================================================================
+// Beauty & Cosmetics Category Filtering (STRICT)
+// ============================================================================
+
+/**
+ * AliExpress Beauty & Health main category ID
+ * Sub-categories: 3001 (Makeup), 3002 (Skin Care), 3003 (Hair Care), 3004 (Nail Art)
+ */
+const BEAUTY_HEALTH_CATEGORY_ID = '66';
+
+const ALLOWED_COSMETIC_CATEGORY_IDS = [
+  '66',    // Beauty & Health (main)
+  '3001',  // Makeup
+  '3002',  // Skin Care
+  '3003',  // Hair Care
+  '3004',  // Nail Art
+  '3005',  // Beauty Tools
+  '3006',  // Fragrances
+  '100003109', // Health & Beauty (alternative ID)
+];
+
+/**
+ * Keywords that MUST be present in product title or category for validation
+ * Products without any of these keywords will be REJECTED
+ */
+const COSMETIC_VALIDATION_KEYWORDS = [
+  // Skincare
+  'serum', 'cream', 'moisturizer', 'cleanser', 'toner', 'mask', 'lotion',
+  'sunscreen', 'spf', 'skincare', 'face', 'facial', 'eye cream', 'lip',
+  'hyaluronic', 'vitamin c', 'retinol', 'collagen', 'anti-aging',
+  // Makeup
+  'lipstick', 'lip gloss', 'mascara', 'eyeliner', 'eyeshadow', 'foundation',
+  'blush', 'concealer', 'primer', 'powder', 'highlighter', 'contour',
+  'brow', 'makeup', 'cosmetic', 'beauty',
+  // Hair
+  'hair', 'shampoo', 'conditioner', 'hair mask', 'hair oil', 'hair serum',
+  // Nails
+  'nail', 'polish', 'gel nail', 'manicure', 'pedicure',
+  // Tools
+  'brush', 'sponge', 'blender', 'roller', 'gua sha', 'mirror',
+  'organizer', 'curler', 'tweezers',
+  // Body
+  'body lotion', 'body cream', 'body scrub', 'shower', 'bath',
+  'hand cream', 'foot cream',
+  // Fragrance
+  'perfume', 'fragrance', 'cologne', 'body mist', 'eau de',
+];
+
+/**
+ * Keywords that indicate NON-cosmetic products - REJECT these
+ */
+const FORBIDDEN_PRODUCT_KEYWORDS = [
+  'phone', 'case', 'cable', 'charger', 'electronic', 'gadget',
+  'toy', 'game', 'tool', 'hardware', 'car', 'auto', 'motor',
+  'sport', 'fitness', 'gym', 'outdoor', 'camping',
+  'kitchen', 'cooking', 'food', 'drink',
+  'clothing', 'shirt', 'pants', 'dress', 'shoe', 'bag',
+  'jewelry', 'watch', 'ring', 'necklace', 'bracelet', 'earring',
+  'home', 'furniture', 'decor', 'garden',
+  'pet', 'dog', 'cat', 'animal',
+  'baby', 'kid', 'child', 'infant',
+  'office', 'stationery', 'book',
+];
+
+/**
+ * Validates if a product belongs to the beauty/cosmetics niche
+ * @returns { valid: boolean, reason: string }
+ */
+export function validateCosmeticProduct(
+  title: string,
+  categoryId: string,
+  categoryName: string
+): { valid: boolean; reason: string } {
+  const titleLower = title.toLowerCase();
+  const categoryLower = categoryName.toLowerCase();
+
+  // Check for forbidden keywords first (strict rejection)
+  for (const forbidden of FORBIDDEN_PRODUCT_KEYWORDS) {
+    if (titleLower.includes(forbidden)) {
+      return {
+        valid: false,
+        reason: `Produit rejeté: contient le mot-clé interdit "${forbidden}"`,
+      };
+    }
+  }
+
+  // Check if category is in allowed list
+  const categoryValid = ALLOWED_COSMETIC_CATEGORY_IDS.includes(categoryId);
+
+  // Check if title or category contains cosmetic keywords
+  const hasValidKeyword = COSMETIC_VALIDATION_KEYWORDS.some(
+    keyword => titleLower.includes(keyword) || categoryLower.includes(keyword)
+  );
+
+  if (!categoryValid && !hasValidKeyword) {
+    return {
+      valid: false,
+      reason: `Produit rejeté: catégorie "${categoryName}" (${categoryId}) non autorisée et aucun mot-clé cosmétique trouvé`,
+    };
+  }
+
+  if (!hasValidKeyword) {
+    return {
+      valid: false,
+      reason: `Produit rejeté: aucun mot-clé cosmétique/beauté trouvé dans le titre`,
+    };
+  }
+
+  return { valid: true, reason: 'Produit validé pour la niche cosmétique' };
+}
+
 export interface AliExpressConfig {
   appKey: string;
   appSecret: string;
@@ -66,7 +177,9 @@ interface AliExpressMerchantProfile {
   shop_url?: string;
 }
 
-export class AliExpressAdapter implements SupplierApi, AliExpressService {
+// Note: This class implements SupplierApi. For AliExpressService functionality,
+// use the searchProductsDetailed, getProductDetails, and other explicit methods.
+export class AliExpressAdapter implements SupplierApi {
   private readonly client: AxiosInstance;
   private readonly config: AliExpressConfig;
   private readonly circuitBreaker: CircuitBreaker;
@@ -478,6 +591,7 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
 
   /**
    * Search products with full details
+   * IMPORTANT: Enforces Beauty & Health category filtering (niche cosmétique)
    */
   async searchProductsDetailed(params: {
     keywords: string;
@@ -502,11 +616,16 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
       total_page_count?: number;
     }
 
+    // STRICT: Force Beauty & Health category if not already specified or if outside allowed list
+    const enforcedCategoryId = params.categoryId && ALLOWED_COSMETIC_CATEGORY_IDS.includes(params.categoryId)
+      ? params.categoryId
+      : BEAUTY_HEALTH_CATEGORY_ID;
+
     const result = await this.executeRequest<SearchResult>(
       'aliexpress.affiliate.product.query',
       {
         keywords: params.keywords,
-        category_ids: params.categoryId,
+        category_ids: enforcedCategoryId, // Always filter by Beauty & Health
         min_sale_price: params.minPrice ? params.minPrice * 100 : undefined,
         max_sale_price: params.maxPrice ? params.maxPrice * 100 : undefined,
         page_no: params.page ?? 1,
@@ -520,8 +639,20 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
 
     const products = result.products?.product ?? [];
 
+    // SECOND FILTER: Validate each product against cosmetic keywords
+    const validatedProducts = products
+      .map(p => this.mapToAliExpressProductData(p))
+      .filter(product => {
+        const validation = validateCosmeticProduct(
+          product.title,
+          product.categoryId,
+          product.categoryName
+        );
+        return validation.valid;
+      });
+
     return {
-      products: products.map(p => this.mapToAliExpressProductData(p)),
+      products: validatedProducts,
       totalCount: result.total_record_count ?? 0,
       currentPage: result.current_page ?? 1,
       totalPages: result.total_page_count ?? 1,
@@ -598,6 +729,7 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
   /**
    * Evaluate a product for import eligibility
    * Returns score result and whether product should be imported
+   * IMPORTANT: Includes STRICT cosmetic niche validation
    */
   async evaluateProductForImport(
     productId: string,
@@ -616,6 +748,50 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
   }> {
     // Fetch product details
     const product = await this.getProductDetails(productId);
+
+    // ========================================================================
+    // GARDE-FOU COSMÉTIQUE: Validation STRICTE avant tout traitement
+    // ========================================================================
+    const cosmeticValidation = validateCosmeticProduct(
+      product.title,
+      product.categoryId,
+      product.categoryName
+    );
+
+    if (!cosmeticValidation.valid) {
+      // Return immediately with zero score - product is NOT in cosmetic niche
+      return {
+        product,
+        shippingCost: 0,
+        suggestedPrice: 0,
+        scoreResult: {
+          totalScore: 0,
+          breakdown: {
+            profitMarginScore: 0,
+            marketDemandScore: 0,
+            logisticsScore: 0,
+            complianceScore: 0,
+            supplierQualityScore: 0,
+            competitivenessScore: 0,
+          },
+          profitability: {
+            costPrice: product.price,
+            shippingCost: 0,
+            totalCost: product.price,
+            sellingPrice: 0,
+            grossProfit: 0,
+            profitMargin: 0,
+            breakEvenUnits: Infinity,
+          },
+          riskFactors: ['HORS_NICHE_COSMETIQUE: Produit rejeté - ne correspond pas à la niche beauté/cosmétique'],
+          shouldImport: false,
+          recommendation: 'NOT_RECOMMENDED',
+        },
+        eligible: false,
+        reason: cosmeticValidation.reason,
+      };
+    }
+    // ========================================================================
 
     // Calculate shipping cost
     const shippingResult = await this.calculateShippingCost({
@@ -645,17 +821,19 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
     let eligible = scoreResult.shouldImport;
     let reason = '';
 
-    if (scoreResult.totalScore < 50) {
+    if (scoreResult.totalScore < 35) {
       reason = `Score trop bas (${scoreResult.totalScore}/100) - Produit non recommandé`;
       eligible = false;
-    } else if (scoreResult.totalScore < 65) {
+    } else if (scoreResult.totalScore < 50) {
       reason = `Score risqué (${scoreResult.totalScore}/100) - Produit en quarantaine`;
       eligible = false;
-    } else if (scoreResult.riskFactors.length >= 3) {
+    } else if (scoreResult.riskFactors.length >= 5) {
       reason = `Trop de facteurs de risque (${scoreResult.riskFactors.length}) détectés`;
       eligible = false;
-    } else if (scoreResult.recommendation === 'GOOD') {
+    } else if (scoreResult.totalScore < 65) {
       reason = `Score acceptable (${scoreResult.totalScore}/100) - Import autorisé`;
+    } else if (scoreResult.recommendation === 'GOOD') {
+      reason = `Bon score (${scoreResult.totalScore}/100) - Import autorisé`;
     } else {
       reason = `Excellent score (${scoreResult.totalScore}/100) - Import prioritaire`;
     }
@@ -725,7 +903,7 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
             suggestedPrice: evaluation.suggestedPrice,
             score: evaluation.scoreResult.totalScore,
           });
-        } else if (evaluation.scoreResult.totalScore >= 50) {
+        } else if (evaluation.scoreResult.totalScore >= 35) {
           quarantine.push({
             productId,
             score: evaluation.scoreResult.totalScore,
@@ -834,14 +1012,16 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
             sku_attr?: string;
             sku_image?: string;
           }) => {
-            variants.push({
+            const variant: ProductVariant = {
               skuId: sku.sku_id ?? '',
               name: sku.sku_display_name ?? '',
               price: parseFloat(sku.sku_price ?? price.toString()),
               stock: sku.sku_stock ? 100 : 0,
               attributes: this.parseSkuAttributes(sku.sku_attr),
-              image: sku.sku_image,
-            });
+            };
+            // Only add image if it exists
+            if (sku.sku_image !== undefined) variant.image = sku.sku_image;
+            variants.push(variant);
           });
         }
       } catch {
@@ -908,14 +1088,13 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
       height: parseFloat(raw.package_height ?? '5'),
     };
 
-    return {
+    const result: AliExpressProductData = {
       productId: raw.product_id,
       title: raw.product_title ?? '',
       description: raw.product_description ?? raw.product_detail_url ?? '',
       descriptionHtml: raw.html_description ?? '',
       images,
       price,
-      originalPrice: originalPrice > price ? originalPrice : undefined,
       currency: 'EUR',
       categoryId: raw.category_id ?? raw.first_level_category_id ?? '',
       categoryName: raw.category_name ?? raw.first_level_category_name ?? 'Other',
@@ -938,6 +1117,13 @@ export class AliExpressAdapter implements SupplierApi, AliExpressService {
       weight,
       dimensions,
     };
+
+    // Only add originalPrice if it's greater than current price
+    if (originalPrice > price) {
+      result.originalPrice = originalPrice;
+    }
+
+    return result;
   }
 
   /**

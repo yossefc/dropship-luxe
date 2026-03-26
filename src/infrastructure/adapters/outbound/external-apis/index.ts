@@ -1,3 +1,12 @@
-export { AliExpressAdapter, type AliExpressConfig } from './aliexpress.adapter.js';
-export { StripeAdapter, type StripeConfig } from './stripe.adapter.js';
+export {
+  AliExpressDSAdapter,
+  AliExpressAdapter, // Backward compatibility alias
+  validateCosmeticProduct,
+  createAliExpressDSAdapter,
+  type AliExpressDSConfig,
+  type AliExpressConfig,
+  type DSProductDetails,
+  type DSCategory,
+  type DSShippingInfo,
+} from './aliexpress-ds.adapter.js';
 export { OpenAIAdapter, type OpenAIConfig } from './openai.adapter.js';

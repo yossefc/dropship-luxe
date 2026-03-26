@@ -8,7 +8,7 @@
 // 4. Store in database with all locale translations
 // ============================================================================
 
-import { AliExpressAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
+import { AliExpressAdapter, validateCosmeticProduct } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
 import { OpenAIAdapter } from '@infrastructure/adapters/outbound/external-apis/openai.adapter.js';
 import { AliExpressProductData } from '@domain/ports/outbound/aliexpress.port.js';
 import { ProductScoreResult } from '@domain/services/product-score-calculator.js';
@@ -286,21 +286,24 @@ export class SyncAliExpressProductsUseCase {
   ): Promise<Record<string, TranslationResult>> {
     const translations: Record<string, TranslationResult> = {};
 
-    for (const locale of locales) {
-      try {
-        // Generate luxury translation via OpenAI
-        const rawTranslation = await this.openaiAdapter.generateLuxuryTranslations({
-          sourceText: product.title,
-          sourceDescription: product.description,
-          targetLocale: locale as 'fr' | 'en' | 'es' | 'it' | 'de',
-          productCategory: 'cosmetics',
-          attributes: product.attributes.map(a => `${a.name}: ${a.value}`),
-        });
+    try {
+      // Generate luxury translations for all locales at once via OpenAI
+      const luxuryResult = await this.openaiAdapter.generateLuxuryTranslations({
+        originalName: product.title,
+        originalDescription: product.description,
+        category: 'cosmetics',
+        targetLocales: locales as Array<'fr' | 'en' | 'es' | 'it' | 'de'>,
+        productBenefits: product.attributes.map(a => `${a.name}: ${a.value}`),
+      });
+
+      // Process each locale translation
+      for (const localizedContent of luxuryResult.translations) {
+        const locale = localizedContent.locale;
 
         // Apply brand-safety guardrails
-        const safeName = this.applyCosmeticGuardrails(rawTranslation.name, locale);
-        const safeDescription = this.applyCosmeticGuardrails(rawTranslation.description, locale);
-        const safeBenefits = rawTranslation.benefits.map(b => this.applyCosmeticGuardrails(b, locale));
+        const safeName = this.applyCosmeticGuardrails(localizedContent.name, locale);
+        const safeDescription = this.applyCosmeticGuardrails(localizedContent.description, locale);
+        const safeBenefits = localizedContent.benefits.map((b: string) => this.applyCosmeticGuardrails(b, locale));
 
         // Add disclaimer to description
         const disclaimer = COSMETIC_GUARDRAILS.disclaimers[locale] ?? COSMETIC_GUARDRAILS.disclaimers['en'];
@@ -312,26 +315,42 @@ export class SyncAliExpressProductsUseCase {
           description: descriptionWithDisclaimer,
           descriptionHtml: this.wrapInHtml(descriptionWithDisclaimer),
           benefits: safeBenefits,
-          metaTitle: rawTranslation.seoTitle,
-          metaDescription: rawTranslation.seoDescription,
-          metaKeywords: rawTranslation.seoKeywords,
+          metaTitle: localizedContent.metaTitle,
+          metaDescription: localizedContent.metaDescription,
+          metaKeywords: localizedContent.metaKeywords.join(', '),
         };
-      } catch (error) {
-        // Fallback to basic translation
-        translations[locale] = {
-          name: product.title,
-          slug: this.generateSlug(product.title),
-          description: product.description,
-          descriptionHtml: product.descriptionHtml,
-          benefits: [],
-          metaTitle: product.title,
-          metaDescription: product.description.substring(0, 160),
-          metaKeywords: product.categoryName,
-        };
+      }
+
+      // Fill in any missing locales with fallback
+      for (const locale of locales) {
+        if (!translations[locale]) {
+          translations[locale] = this.createFallbackTranslation(product, locale);
+        }
+      }
+    } catch (error) {
+      // Fallback to basic translation for all locales on error
+      for (const locale of locales) {
+        translations[locale] = this.createFallbackTranslation(product, locale);
       }
     }
 
     return translations;
+  }
+
+  /**
+   * Create fallback translation when AI generation fails
+   */
+  private createFallbackTranslation(product: AliExpressProductData, locale: string): TranslationResult {
+    return {
+      name: product.title,
+      slug: this.generateSlug(product.title),
+      description: product.description,
+      descriptionHtml: product.descriptionHtml,
+      benefits: [],
+      metaTitle: product.title,
+      metaDescription: product.description.substring(0, 160),
+      metaKeywords: product.categoryName,
+    };
   }
 
   /**
@@ -357,6 +376,7 @@ export class SyncAliExpressProductsUseCase {
 
   /**
    * Store product and translations in database
+   * IMPORTANT: Includes FINAL cosmetic validation guard before insertion
    */
   private async storeProduct(
     product: AliExpressProductData,
@@ -364,6 +384,26 @@ export class SyncAliExpressProductsUseCase {
     scoreResult: ProductScoreResult,
     translations: Record<string, TranslationResult>
   ): Promise<{ id: string }> {
+    // ========================================================================
+    // GARDE-FOU FINAL: Dernière vérification AVANT insertion en base
+    // Cette validation est CRITIQUE - elle empêche tout produit non-cosmétique
+    // d'être stocké dans la base de données, même si les filtres précédents
+    // ont échoué pour une raison quelconque.
+    // ========================================================================
+    const finalValidation = validateCosmeticProduct(
+      product.title,
+      product.categoryId,
+      product.categoryName
+    );
+
+    if (!finalValidation.valid) {
+      throw new Error(
+        `INSERTION BLOQUÉE: ${finalValidation.reason}. ` +
+        `Produit "${product.title}" (${product.productId}) rejeté par le garde-fou cosmétique.`
+      );
+    }
+    // ========================================================================
+
     // Create product with translations in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
       // Find or create category
@@ -395,7 +435,11 @@ export class SyncAliExpressProductsUseCase {
           currency: 'EUR',
           costPrice: new Prisma.Decimal(product.price),
           weight: new Prisma.Decimal(product.weight),
-          dimensions: product.dimensions,
+          dimensions: {
+            length: product.dimensions.length,
+            width: product.dimensions.width,
+            height: product.dimensions.height,
+          } as Prisma.JsonObject,
           images: product.images,
           isActive: true,
           isFeatured: scoreResult.totalScore >= 80,
@@ -408,6 +452,11 @@ export class SyncAliExpressProductsUseCase {
 
       // Create translations
       for (const [locale, translation] of Object.entries(translations)) {
+        // Convert metaKeywords string to array for Prisma
+        const keywordsArray = translation.metaKeywords
+          ? translation.metaKeywords.split(',').map((k: string) => k.trim()).filter(Boolean)
+          : [];
+
         await tx.productTranslation.create({
           data: {
             productId: createdProduct.id,
@@ -419,7 +468,7 @@ export class SyncAliExpressProductsUseCase {
             benefits: translation.benefits,
             metaTitle: translation.metaTitle,
             metaDescription: translation.metaDescription,
-            metaKeywords: translation.metaKeywords,
+            metaKeywords: keywordsArray,
             aiModel: 'gpt-4',
             aiPromptVersion: '1.0',
             generatedAt: new Date(),
@@ -437,7 +486,7 @@ export class SyncAliExpressProductsUseCase {
             price: new Prisma.Decimal(variant.price),
             stock: variant.stock,
             attributes: variant.attributes as Prisma.JsonObject,
-            image: variant.image,
+            image: variant.image ?? null,
             isActive: true,
           },
         });

@@ -58,15 +58,27 @@ export class SyncProductTranslationsUseCase {
     });
 
     try {
-      // Generate luxury translations for all target locales
-      const result = await this.aiContentService.generateLuxuryTranslations({
+      // Build params object, only including optional properties if defined
+      const translationParams: {
+        originalName: string;
+        originalDescription: string;
+        category: string;
+        targetLocales: SupportedLocale[];
+        productBenefits?: string[];
+        ingredients?: string;
+      } = {
         originalName: input.originalName,
         originalDescription: input.originalDescription,
         category: input.category,
         targetLocales,
-        productBenefits: input.productBenefits,
-        ingredients: input.ingredients,
-      });
+      };
+
+      // Only add optional params if they have values
+      if (input.productBenefits !== undefined) translationParams.productBenefits = input.productBenefits;
+      if (input.ingredients !== undefined) translationParams.ingredients = input.ingredients;
+
+      // Generate luxury translations for all target locales
+      const result = await this.aiContentService.generateLuxuryTranslations(translationParams);
 
       // Persist translations to database
       await this.translationRepository.upsertTranslations(

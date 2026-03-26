@@ -137,7 +137,7 @@ export function createServer(
 }
 
 function shouldAuditRequest(req: Request): boolean {
-  return req.path.startsWith('/webhooks/stripe')
+  return req.path.startsWith('/webhooks/hyp')
     || req.path.startsWith('/api/aliexpress')
     || ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
 }
@@ -149,8 +149,8 @@ function resolveAuditActor(req: Request): string {
     return headerValue;
   }
 
-  if (req.path.startsWith('/webhooks/stripe')) {
-    return 'stripe_webhook';
+  if (req.path.startsWith('/webhooks/hyp')) {
+    return 'hyp_webhook';
   }
 
   if (req.path.startsWith('/api/aliexpress')) {

@@ -119,12 +119,12 @@ export class PrismaProductTranslationRepository implements ProductTranslationRep
   ): Promise<{
     product: {
       id: string;
-      sku: string;
+      sku: string | null;
       images: string[];
       sellingPrice: number;
-      sellingCurrency: string;
+      currency: string;
       stock: number;
-      rating: number;
+      rating: number | null;
     };
     translation: LocalizedProductContent;
   } | null> {
@@ -140,7 +140,7 @@ export class PrismaProductTranslationRepository implements ProductTranslationRep
             sku: true,
             images: true,
             sellingPrice: true,
-            sellingCurrency: true,
+            currency: true,
             stock: true,
             rating: true,
           },
@@ -156,9 +156,9 @@ export class PrismaProductTranslationRepository implements ProductTranslationRep
         sku: result.product.sku,
         images: result.product.images,
         sellingPrice: Number(result.product.sellingPrice),
-        sellingCurrency: result.product.sellingCurrency,
+        currency: result.product.currency,
         stock: result.product.stock,
-        rating: Number(result.product.rating),
+        rating: result.product.rating ? Number(result.product.rating) : null,
       },
       translation: {
         locale: result.locale as LocalizedProductContent['locale'],

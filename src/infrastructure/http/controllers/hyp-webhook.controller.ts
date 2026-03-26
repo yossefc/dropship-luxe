@@ -16,8 +16,7 @@
 // ============================================================================
 
 import { Request, Response, Router } from 'express';
-import { Queue } from 'bullmq';
-import Redis from 'ioredis';
+import { Queue, ConnectionOptions } from 'bullmq';
 import { PrismaClient, OrderStatus, PaymentStatus } from '@prisma/client';
 import { HypAdapter, HypWebhookPayload } from '@infrastructure/adapters/outbound/payment/hyp.adapter.js';
 import { Logger, AuditLogger } from '@infrastructure/config/logger.js';
@@ -68,7 +67,7 @@ export class HypWebhookController {
   constructor(
     hypAdapter: HypAdapter,
     prisma: PrismaClient,
-    redisConnection: Redis,
+    redisConnectionOptions: ConnectionOptions,
     logger: Logger,
     auditLogger?: AuditLogger
   ) {
@@ -79,7 +78,7 @@ export class HypWebhookController {
 
     // Initialiser la queue BullMQ pour traitement asynchrone
     this.paymentQueue = new Queue<PaymentProcessingJob>('hyp-payments', {
-      connection: redisConnection,
+      connection: redisConnectionOptions,
       defaultJobOptions: {
         attempts: 5,
         backoff: {
@@ -175,7 +174,7 @@ export class HypWebhookController {
     // Vérifier en base de données également
     const existingEvent = await this.prisma.webhookEvent.findFirst({
       where: {
-        stripeEventId: eventId,  // Réutiliser le champ existant
+        eventId: eventId,  // Réutiliser le champ existant
       },
     });
 
@@ -192,10 +191,10 @@ export class HypWebhookController {
       // Enregistrer l'événement pour déduplication
       await this.prisma.webhookEvent.create({
         data: {
-          stripeEventId: eventId,  // Réutiliser pour compatibilité
+          eventId: eventId,  // Réutiliser pour compatibilité
           eventType: this.determineEventType(payload.CCode),
           status: 'processing',
-          payload: payload as unknown as Record<string, unknown>,
+          payload: JSON.parse(JSON.stringify(payload)),
           receivedAt: new Date(),
         },
       });
@@ -325,7 +324,7 @@ export class HypWebhookController {
         data: {
           status: OrderStatus.paid,
           paymentStatus: PaymentStatus.succeeded,
-          stripePaymentIntentId: transactionId,  // Stocker l'ID transaction Hyp
+          hypTransactionId: transactionId,  // ID transaction Hyp
           paidAt: new Date(),
           notes: `Paiement Hyp validé. Auth: ${authorizationCode}, Carte: ****${cardLast4 ?? '****'}`,
         },
@@ -353,7 +352,7 @@ export class HypWebhookController {
 
       // 6. Marquer l'événement webhook comme traité
       await this.prisma.webhookEvent.updateMany({
-        where: { stripeEventId: job.eventId },
+        where: { eventId: job.eventId },
         data: {
           status: 'completed',
           processedAt: new Date(),
@@ -369,7 +368,7 @@ export class HypWebhookController {
 
       // Marquer l'événement comme échoué
       await this.prisma.webhookEvent.updateMany({
-        where: { stripeEventId: job.eventId },
+        where: { eventId: job.eventId },
         data: {
           status: 'failed',
           errorMessage: error instanceof Error ? error.message : 'Unknown error',
@@ -421,7 +420,7 @@ export class HypWebhookController {
 
       // Marquer l'événement comme traité
       await this.prisma.webhookEvent.updateMany({
-        where: { stripeEventId: job.eventId },
+        where: { eventId: job.eventId },
         data: {
           status: 'completed',
           processedAt: new Date(),
@@ -447,7 +446,7 @@ export class HypWebhookController {
   private async queueAliExpressOrder(orderId: string): Promise<void> {
     // Créer une queue dédiée pour le fulfillment si elle n'existe pas
     const fulfillmentQueue = new Queue('order-fulfillment', {
-      connection: this.paymentQueue.opts.connection as Redis,
+      connection: this.paymentQueue.opts.connection as ConnectionOptions,
     });
 
     await fulfillmentQueue.add('create_aliexpress_order', {
@@ -543,7 +542,7 @@ export class HypWebhookController {
 export function createHypWebhookRouter(
   hypAdapter: HypAdapter,
   prisma: PrismaClient,
-  redisConnection: Redis,
+  redisConnectionOptions: ConnectionOptions,
   logger: Logger,
   auditLogger?: AuditLogger
 ): { router: Router; controller: HypWebhookController } {
@@ -551,7 +550,7 @@ export function createHypWebhookRouter(
   const controller = new HypWebhookController(
     hypAdapter,
     prisma,
-    redisConnection,
+    redisConnectionOptions,
     logger,
     auditLogger
   );

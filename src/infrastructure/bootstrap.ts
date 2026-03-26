@@ -26,9 +26,15 @@ import { BullMQAdapter } from '@infrastructure/messaging/bullmq.adapter.js';
 
 // Adapters - Hyp remplace Stripe
 import { HypAdapter, createHypAdapter } from '@infrastructure/adapters/outbound/payment/hyp.adapter.js';
-import { AliExpressAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
+import { AliExpressDSAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress-ds.adapter.js';
 import { OpenAIAdapter } from '@infrastructure/adapters/outbound/external-apis/openai.adapter.js';
 import { createAliExpressOAuthService } from '@infrastructure/adapters/outbound/external-apis/aliexpress-oauth.service.js';
+
+// Value Objects
+import { Money } from '@domain/value-objects/money.js';
+import { Email } from '@domain/value-objects/email.js';
+import { Address } from '@domain/value-objects/address.js';
+import { Currency } from '@shared/types/index.js';
 
 // Controllers & Routers
 import { createHypWebhookRouter, HypWebhookController, PaymentProcessingJob } from '@infrastructure/http/controllers/hyp-webhook.controller.js';
@@ -89,13 +95,17 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // ==========================================================================
   // 2. Initialize Redis Connection
   // ==========================================================================
-  const redisConnection = new Redis({
+  // Connection options for BullMQ (shared configuration)
+  const bullmqConnectionOptions = {
     host: env.REDIS_HOST,
     port: env.REDIS_PORT,
     password: env.REDIS_PASSWORD ?? undefined,
     maxRetriesPerRequest: null,  // Required for BullMQ
     enableReadyCheck: false,
-  });
+  };
+
+  // Separate Redis connection for non-BullMQ operations
+  const redisConnection = new Redis(bullmqConnectionOptions);
 
   redisConnection.on('connect', () => {
     logger.info('Redis connected', { host: env.REDIS_HOST, port: env.REDIS_PORT });
@@ -127,14 +137,17 @@ export async function bootstrap(): Promise<BootstrapResult> {
   const hypAdapter = createHypAdapter(logger);
   logger.info('Hyp (YaadPay) payment adapter initialized');
 
-  // AliExpress Adapter
-  const aliexpressAdapter = new AliExpressAdapter({
+  // AliExpress OAuth Service (pour gestion des tokens)
+  const aliexpressOAuthService = createAliExpressOAuthService(prisma);
+
+  // AliExpress DS Adapter (avec callback OAuth pour refresh automatique)
+  const aliexpressAdapter = new AliExpressDSAdapter({
     appKey: env.ALIEXPRESS_APP_KEY,
     appSecret: env.ALIEXPRESS_APP_SECRET,
-    accessToken: env.ALIEXPRESS_ACCESS_TOKEN,
+    getAccessToken: async () => aliexpressOAuthService.getValidAccessToken(),
     trackingId: env.ALIEXPRESS_TRACKING_ID,
   });
-  logger.info('AliExpress adapter initialized');
+  logger.info('AliExpress DS adapter initialized (with OAuth token refresh)');
 
   // OpenAI Adapter (pour traductions produits)
   const openaiAdapter = new OpenAIAdapter({
@@ -153,7 +166,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
   const { router: hypWebhookRouter, controller: hypWebhookController } = createHypWebhookRouter(
     hypAdapter,
     prisma,
-    redisConnection,
+    bullmqConnectionOptions,
     logger,
     auditLogger
   );
@@ -197,6 +210,227 @@ export async function bootstrap(): Promise<BootstrapResult> {
       res.status(500).json({
         success: false,
         error: 'Failed to fetch products',
+      });
+    }
+  });
+
+  // ==========================================================================
+  // POST /api/v1/orders - Create Order and Generate Hyp Payment Link
+  // ==========================================================================
+  app.post('/api/v1/orders', async (req, res) => {
+    try {
+      const {
+        customer,
+        shippingAddress,
+        items,
+        shippingMethod,
+        shippingCost,
+        subtotal,
+        total,
+        currency = 'EUR',
+      } = req.body;
+
+      // Validate required fields
+      if (!customer?.email || !shippingAddress || !items?.length) {
+        res.status(400).json({
+          success: false,
+          error: 'Missing required fields: customer, shippingAddress, items',
+        });
+        return;
+      }
+
+      logger.info('Creating new order', {
+        email: customer.email,
+        itemCount: items.length,
+        total,
+        currency,
+      });
+
+      // Generate order number
+      const orderNumber = `DL-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      // Create or find customer
+      let dbCustomer = await prisma.customer.findUnique({
+        where: { email: customer.email },
+      });
+
+      if (!dbCustomer) {
+        dbCustomer = await prisma.customer.create({
+          data: {
+            email: customer.email,
+            firstName: customer.firstName || '',
+            lastName: customer.lastName || '',
+            phone: customer.phone || null,
+          },
+        });
+        logger.info('Created new customer', { customerId: dbCustomer.id });
+      }
+
+      // Calculate tax (20% TVA for France)
+      const tax = subtotal * 0.20;
+
+      // Create the order
+      const order = await prisma.order.create({
+        data: {
+          orderNumber,
+          customerId: dbCustomer.id,
+          customerEmail: customer.email,
+          status: 'pending',
+          paymentStatus: 'pending',
+          subtotal,
+          shippingCost,
+          tax,
+          total,
+          currency,
+          // Shipping address
+          shippingFirstName: shippingAddress.firstName,
+          shippingLastName: shippingAddress.lastName,
+          shippingStreet: shippingAddress.street,
+          shippingCity: shippingAddress.city,
+          shippingPostalCode: shippingAddress.postalCode,
+          shippingCountry: shippingAddress.country,
+          shippingPhone: shippingAddress.phone || null,
+          // Billing = Shipping for now
+          billingFirstName: shippingAddress.firstName,
+          billingLastName: shippingAddress.lastName,
+          billingStreet: shippingAddress.street,
+          billingCity: shippingAddress.city,
+          billingPostalCode: shippingAddress.postalCode,
+          billingCountry: shippingAddress.country,
+          // Order items
+          items: {
+            create: items.map((item: any) => ({
+              productId: item.productId,
+              variantId: item.variantId || null,
+              variantName: item.variantName || null,
+              productName: item.name || item.productName || 'Product',
+              sku: item.sku || `SKU-${item.productId}`,
+              quantity: item.quantity,
+              unitPrice: item.price,
+              supplierPrice: item.supplierPrice || item.price * 0.4, // Estimate supplier price
+              currency,
+            })),
+          },
+        },
+        include: {
+          items: true,
+        },
+      });
+
+      logger.info('Order created', {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        total: order.total,
+      });
+
+      // Generate Hyp payment link
+      const paymentResult = await hypAdapter.createPaymentIntent({
+        orderId: order.orderNumber,
+        amount: Money.create(total, currency as Currency),
+        customerEmail: Email.create(customer.email),
+        customerId: dbCustomer.id,
+        metadata: {
+          orderDbId: order.id,
+          customerName: `${customer.firstName} ${customer.lastName}`,
+        },
+      });
+
+      // Update order with payment intent ID
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          hypTransactionId: paymentResult.id,
+        },
+      });
+
+      logger.info('Payment link generated', {
+        orderId: order.id,
+        paymentIntentId: paymentResult.id,
+      });
+
+      // Return success with payment URL
+      res.status(201).json({
+        success: true,
+        order: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          total: order.total,
+          currency: order.currency,
+        },
+        paymentUrl: paymentResult.clientSecret, // This is the Hyp redirect URL
+      });
+
+    } catch (error) {
+      logger.error('Failed to create order', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create order. Please try again.',
+      });
+    }
+  });
+
+  // ==========================================================================
+  // GET /api/v1/orders/:orderNumber - Get Order Status
+  // ==========================================================================
+  app.get('/api/v1/orders/:orderNumber', async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+
+      const order = await prisma.order.findUnique({
+        where: { orderNumber },
+        include: {
+          items: true,
+          supplierOrders: true,
+        },
+      });
+
+      if (!order) {
+        res.status(404).json({
+          success: false,
+          error: 'Order not found',
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        order: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          total: order.total,
+          currency: order.currency,
+          createdAt: order.createdAt,
+          paidAt: order.paidAt,
+          items: order.items.map(item => ({
+            name: item.productName,
+            quantity: item.quantity,
+            price: item.unitPrice,
+            variantName: item.variantName,
+          })),
+          tracking: order.supplierOrders
+            .filter(so => so.trackingNumber)
+            .map(so => ({
+              trackingNumber: so.trackingNumber,
+              carrier: so.carrier,
+              status: so.status,
+            })),
+        },
+      });
+
+    } catch (error) {
+      logger.error('Failed to fetch order', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch order',
       });
     }
   });
@@ -428,7 +662,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
       if (quarantineThreshold !== undefined) adminSettings.quarantineThreshold = parseInt(quarantineThreshold);
       if (autoImportEnabled !== undefined) adminSettings.autoImportEnabled = Boolean(autoImportEnabled);
 
-      logger.info('Admin settings updated', adminSettings);
+      logger.info('Admin settings updated', adminSettings as unknown as Record<string, unknown>);
 
       res.json(adminSettings);
     } catch (error) {
@@ -555,7 +789,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
       return { processed: true, eventType };
     },
     {
-      connection: redisConnection,
+      connection: bullmqConnectionOptions,
       concurrency: 5,
     }
   );
@@ -606,23 +840,36 @@ export async function bootstrap(): Promise<BootstrapResult> {
       for (const item of order.items) {
         try {
           // Sanitiser l'adresse
-          const sanitizedAddress = {
-            fullName: `${order.shippingFirstName} ${order.shippingLastName}`
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .toUpperCase(),
-            street: order.shippingStreet
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .toUpperCase(),
-            city: order.shippingCity
-              .normalize('NFD')
-              .replace(/[\u0300-\u036f]/g, '')
-              .toUpperCase(),
-            postalCode: order.shippingPostalCode.replace(/\s/g, ''),
-            country: order.shippingCountry.toUpperCase(),
-            phone: order.shippingPhone ?? '',
-          };
+          const sanitizedFirstName = order.shippingFirstName
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase();
+          const sanitizedLastName = order.shippingLastName
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase();
+          const sanitizedStreet = order.shippingStreet
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase();
+          const sanitizedCity = order.shippingCity
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase();
+          const sanitizedPostalCode = order.shippingPostalCode.replace(/\s/g, '');
+          const sanitizedCountry = order.shippingCountry.toUpperCase();
+          const sanitizedPhone = order.shippingPhone ?? '';
+
+          // Create Address value object for supplier
+          const shippingAddress = Address.create({
+            firstName: sanitizedFirstName,
+            lastName: sanitizedLastName,
+            street: sanitizedStreet,
+            city: sanitizedCity,
+            postalCode: sanitizedPostalCode,
+            country: sanitizedCountry,
+            ...(sanitizedPhone ? { phone: sanitizedPhone } : {}),
+          });
 
           // Créer l'enregistrement SupplierOrder
           const supplierOrder = await prisma.supplierOrder.create({
@@ -634,12 +881,12 @@ export async function bootstrap(): Promise<BootstrapResult> {
               unitCost: item.supplierPrice,
               shippingCost: 0,
               totalCost: item.supplierPrice.toNumber() * item.quantity,
-              shippingName: sanitizedAddress.fullName,
-              shippingAddress: sanitizedAddress.street,
-              shippingCity: sanitizedAddress.city,
-              shippingPostalCode: sanitizedAddress.postalCode,
-              shippingCountry: sanitizedAddress.country,
-              shippingPhone: sanitizedAddress.phone,
+              shippingName: `${sanitizedFirstName} ${sanitizedLastName}`,
+              shippingAddress: sanitizedStreet,
+              shippingCity: sanitizedCity,
+              shippingPostalCode: sanitizedPostalCode,
+              shippingCountry: sanitizedCountry,
+              shippingPhone: sanitizedPhone,
               status: 'pending',
             },
           });
@@ -653,7 +900,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
                 quantity: item.quantity,
               },
             ],
-            sanitizedAddress
+            shippingAddress
           );
 
           // Mettre à jour avec l'ID AliExpress
@@ -689,7 +936,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
       return { processed: true, orderId };
     },
     {
-      connection: redisConnection,
+      connection: bullmqConnectionOptions,
       concurrency: 3,
     }
   );
@@ -768,7 +1015,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
   const trackingSyncJob = createTrackingSyncJob(prisma, {
     appKey: env.ALIEXPRESS_APP_KEY,
     appSecret: env.ALIEXPRESS_APP_SECRET,
-    accessToken: env.ALIEXPRESS_ACCESS_TOKEN,
+    getAccessToken: async () => aliexpressOAuthService.getValidAccessToken(),
     trackingId: env.ALIEXPRESS_TRACKING_ID,
   });
 
@@ -845,6 +1092,8 @@ export async function bootstrap(): Promise<BootstrapResult> {
     logger.info('  - GET  /api/aliexpress/callback');
     logger.info('  - GET  /api/aliexpress/status');
     logger.info('  - GET  /api/v1/products');
+    logger.info('  - POST /api/v1/orders');
+    logger.info('  - GET  /api/v1/orders/:orderNumber');
     logger.info('Admin API:');
     logger.info('  - GET  /api/admin/health');
     logger.info('  - GET  /api/admin/imports');

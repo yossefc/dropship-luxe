@@ -13,7 +13,7 @@ model Customer {
   firstName         String    @map("first_name")
   lastName          String    @map("last_name")
   phone             String?
-  stripeCustomerId  String?   @unique @map("stripe_customer_id")
+  paymentCustomerId String?   @unique @map("payment_customer_id")
   isVerified        Boolean   @default(false) @map("is_verified")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
@@ -268,7 +268,7 @@ model Order {
   // Status
   status                OrderStatus   @default(pending)
   paymentStatus         PaymentStatus @default(pending) @map("payment_status")
-  stripePaymentIntentId String?       @map("stripe_payment_intent_id")
+  hypTransactionId      String?       @map("hyp_transaction_id")
 
   // Supplier Orders
   aliexpressOrderIds    String[]      @map("aliexpress_order_ids")
@@ -291,7 +291,7 @@ model Order {
   @@index([paymentStatus])
   @@index([customerId])
   @@index([createdAt])
-  @@index([stripePaymentIntentId])
+  @@index([hypTransactionId])
   @@map("orders")
 }
 
@@ -428,7 +428,7 @@ enum QuarantineStatus {
 
 model WebhookEvent {
   id              String        @id @default(uuid())
-  stripeEventId   String        @unique @map("stripe_event_id")
+  eventId         String        @unique @map("event_id")
   eventType       String?       @map("event_type")
   status          WebhookStatus @default(processing)
   payload         Json?
@@ -437,7 +437,7 @@ model WebhookEvent {
   receivedAt      DateTime      @default(now()) @map("received_at")
   createdAt       DateTime      @default(now()) @map("created_at")
 
-  @@index([stripeEventId])
+  @@index([eventId])
   @@index([status])
   @@index([receivedAt])
   @@map("webhook_events")

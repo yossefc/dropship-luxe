@@ -2,7 +2,8 @@
 // Product Score Calculator
 // ============================================================================
 // Filters products based on profitability, demand, logistics, and compliance.
-// Score: 0-49 = Not Recommended | 50-64 = Risky | 65-79 = Good | 80-100 = Strong
+// Score: 0-34 = Not Recommended | 35-49 = Risky | 50-79 = Good | 80-100 = Strong
+// Optimized for cosmetics import with relaxed thresholds
 // ============================================================================
 
 import { AliExpressProductData, ShippingCostResult } from '@domain/ports/outbound/aliexpress.port.js';
@@ -75,7 +76,7 @@ const COSMETIC_CATEGORIES = [
 // ============================================================================
 
 export class ProductScoreCalculator {
-  private readonly minScoreForImport = 65;
+  private readonly minScoreForImport = 50; // Reduced threshold to import more cosmetic products
 
   /**
    * Calculate the complete product score
@@ -123,7 +124,7 @@ export class ProductScoreCalculator {
       breakdown,
       profitability,
       riskFactors,
-      shouldImport: totalScore >= this.minScoreForImport && riskFactors.length < 3,
+      shouldImport: totalScore >= this.minScoreForImport && riskFactors.length < 5,
     };
   }
 
@@ -165,11 +166,11 @@ export class ProductScoreCalculator {
    * Based on: (Selling Price - Cost - Shipping) / Selling Price
    */
   private calculateProfitMarginScore(marginPercent: number): number {
-    if (marginPercent >= 60) return 20;
-    if (marginPercent >= 50) return 16;
-    if (marginPercent >= 40) return 12;
-    if (marginPercent >= 30) return 8;
-    return 4; // Below 30% = high risk for customer acquisition
+    if (marginPercent >= 55) return 20;
+    if (marginPercent >= 45) return 16;
+    if (marginPercent >= 35) return 12;
+    if (marginPercent >= 25) return 8;
+    return 4; // Below 25% = high risk for customer acquisition
   }
 
   /**
@@ -179,27 +180,27 @@ export class ProductScoreCalculator {
   private calculateMarketDemandScore(product: AliExpressProductData): number {
     let score = 0;
 
-    // Review count (max 10 points)
-    if (product.reviewCount > 3000) {
+    // Review count (max 10 points) - Relaxed thresholds for cosmetics
+    if (product.reviewCount > 1000) {
       score += 10;
-    } else if (product.reviewCount > 1000) {
-      score += 8;
     } else if (product.reviewCount > 500) {
-      score += 6;
+      score += 8;
     } else if (product.reviewCount > 100) {
+      score += 6;
+    } else if (product.reviewCount > 20) {
       score += 4;
     } else {
       score += 2;
     }
 
-    // Order volume / Sales ranking proxy (max 10 points)
-    if (product.orderCount > 10000) {
+    // Order volume / Sales ranking proxy (max 10 points) - Relaxed thresholds
+    if (product.orderCount > 5000) {
       score += 10;
-    } else if (product.orderCount > 5000) {
-      score += 8;
     } else if (product.orderCount > 1000) {
+      score += 8;
+    } else if (product.orderCount > 300) {
       score += 6;
-    } else if (product.orderCount > 500) {
+    } else if (product.orderCount > 50) {
       score += 4;
     } else {
       score += 2;
@@ -258,9 +259,10 @@ export class ProductScoreCalculator {
       score -= 3;
     }
 
-    // Cosmetics-specific (reduced deduction as it's our niche)
+    // Cosmetics-specific: NO deduction - this is our niche!
+    // We actually WANT cosmetic products, so we give them a bonus
     if (COSMETIC_CATEGORIES.some(cat => combinedText.includes(cat))) {
-      score -= 1; // Minor deduction - we specialize in cosmetics
+      score += 2; // Bonus for cosmetic products
     }
 
     // Fragile materials deduction (-2)
@@ -368,8 +370,8 @@ export class ProductScoreCalculator {
     score: number
   ): 'NOT_RECOMMENDED' | 'RISKY' | 'GOOD' | 'STRONG' {
     if (score >= 80) return 'STRONG';
-    if (score >= 65) return 'GOOD';
-    if (score >= 50) return 'RISKY';
+    if (score >= 50) return 'GOOD';
+    if (score >= 35) return 'RISKY';
     return 'NOT_RECOMMENDED';
   }
 
@@ -380,42 +382,42 @@ export class ProductScoreCalculator {
   ): string[] {
     const risks: string[] = [];
 
-    // Profitability risks
-    if (profitability.profitMargin < 30) {
-      risks.push('CRITICAL: Profit margin below 30% - unsustainable for paid acquisition');
-    } else if (profitability.profitMargin < 40) {
+    // Profitability risks - More relaxed thresholds
+    if (profitability.profitMargin < 20) {
+      risks.push('CRITICAL: Profit margin below 20% - unsustainable for paid acquisition');
+    } else if (profitability.profitMargin < 30) {
       risks.push('WARNING: Low profit margin may limit marketing budget');
     }
 
-    // Demand risks
-    if (product.reviewCount < 100) {
-      risks.push('WARNING: Low review count - unproven product demand');
+    // Demand risks - More relaxed thresholds
+    if (product.reviewCount < 10) {
+      risks.push('WARNING: Very low review count - unproven product demand');
     }
 
-    if (product.orderCount < 500) {
+    if (product.orderCount < 50) {
       risks.push('WARNING: Low order volume - limited sales history');
     }
 
-    // Quality risks
-    if (product.rating < 4.0) {
-      risks.push('CRITICAL: Product rating below 4.0 - quality concerns');
+    // Quality risks - Keep strict for quality
+    if (product.rating < 3.5) {
+      risks.push('CRITICAL: Product rating below 3.5 - quality concerns');
     }
 
-    if (product.supplierRating < 4.0) {
-      risks.push('WARNING: Supplier rating below 4.0 - reliability concerns');
+    if (product.supplierRating < 3.5) {
+      risks.push('WARNING: Supplier rating below 3.5 - reliability concerns');
     }
 
     // Logistics risks
-    if (product.weight > 2) {
-      risks.push('WARNING: Heavy product (>2kg) - high shipping costs');
+    if (product.weight > 3) {
+      risks.push('WARNING: Heavy product (>3kg) - high shipping costs');
     }
 
-    if (product.shippingInfo.maxDays > 30) {
-      risks.push('WARNING: Long shipping time (>30 days) - customer experience risk');
+    if (product.shippingInfo.maxDays > 45) {
+      risks.push('WARNING: Long shipping time (>45 days) - customer experience risk');
     }
 
     // Stock risks
-    if (product.stock < 50) {
+    if (product.stock < 20) {
       risks.push('WARNING: Low stock availability');
     }
 

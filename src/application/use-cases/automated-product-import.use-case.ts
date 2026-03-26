@@ -3,19 +3,21 @@
 // ============================================================================
 // Orchestrates the complete automated product import workflow:
 // 1. Search products by keywords/categories on AliExpress
-// 2. Apply product scoring and filtering (65+ threshold)
+// 2. Apply product scoring and filtering (50+ threshold for cosmetics)
 // 3. Generate luxury translations with brand-safety guardrails
 // 4. Store products with all locale translations
 // 5. Support scheduled imports via BullMQ jobs
 // ============================================================================
 
-import { Queue, Worker, Job } from 'bullmq';
+import { Queue, Worker, Job, ConnectionOptions } from 'bullmq';
 import { PrismaClient } from '@prisma/client';
-import { AliExpressAdapter, AliExpressConfig } from '@infrastructure/adapters/outbound/external-apis/aliexpress.adapter.js';
+import { AliExpressDSAdapter, AliExpressDSConfig } from '@infrastructure/adapters/outbound/external-apis/aliexpress-ds.adapter.js';
 import { OpenAIAdapter, OpenAIConfig } from '@infrastructure/adapters/outbound/external-apis/openai.adapter.js';
 import { SyncAliExpressProductsUseCase, SyncConfig, SyncResult } from './sync-aliexpress-products.use-case.js';
 import { logger } from '@shared/utils/logger.js';
-import Redis from 'ioredis';
+
+// Type for Redis connection - can be URL string or connection options
+type RedisConnectionConfig = string | ConnectionOptions;
 
 // ============================================================================
 // Types
@@ -74,16 +76,54 @@ const DEFAULT_SYNC_CONFIG: SyncConfig = {
 };
 
 const DEFAULT_COSMETIC_KEYWORDS = [
-  'skincare serum',
-  'face cream luxury',
-  'makeup brush set',
-  'lipstick matte',
-  'eye shadow palette',
+  // Soins du visage
+  'face serum',
+  'face cream',
+  'facial moisturizer',
   'facial cleanser',
-  'moisturizer cream',
-  'anti aging serum', // Will be filtered by our guardrails
-  'foundation makeup',
-  'mascara waterproof',
+  'face mask sheet',
+  'face toner',
+  'eye cream',
+  'lip balm',
+  'sunscreen face',
+  // Maquillage
+  'lipstick',
+  'lip gloss',
+  'mascara',
+  'eyeliner',
+  'eyeshadow palette',
+  'foundation liquid',
+  'blush powder',
+  'concealer',
+  'makeup primer',
+  'setting powder',
+  'highlighter makeup',
+  'contour palette',
+  'brow pencil',
+  // Accessoires beauté
+  'makeup brush set',
+  'beauty blender sponge',
+  'face roller jade',
+  'gua sha',
+  'makeup mirror led',
+  'makeup organizer',
+  'eyelash curler',
+  // Soins corps
+  'body lotion',
+  'hand cream',
+  'body scrub',
+  'shower gel',
+  // Parfum
+  'perfume oil',
+  'body mist',
+  // Soins cheveux
+  'hair serum',
+  'hair mask',
+  'hair oil treatment',
+  // Ongles
+  'nail polish',
+  'nail art set',
+  'gel nail kit',
 ];
 
 // ============================================================================
@@ -94,18 +134,20 @@ export class AutomatedProductImportUseCase {
   private readonly queue: Queue;
   private worker: Worker | null = null;
   private readonly prisma: PrismaClient;
-  private readonly aliexpressAdapter: AliExpressAdapter;
+  private readonly aliexpressAdapter: AliExpressDSAdapter;
   private readonly openaiAdapter: OpenAIAdapter;
   private readonly syncUseCase: SyncAliExpressProductsUseCase;
+  private readonly redisConnection: RedisConnectionConfig;
 
   constructor(
-    redisConnection: Redis,
+    redisConnection: RedisConnectionConfig,
     prisma: PrismaClient,
-    aliexpressConfig: AliExpressConfig,
+    aliexpressConfig: AliExpressDSConfig,
     openaiConfig: OpenAIConfig
   ) {
     this.prisma = prisma;
-    this.aliexpressAdapter = new AliExpressAdapter(aliexpressConfig);
+    this.redisConnection = redisConnection;
+    this.aliexpressAdapter = new AliExpressDSAdapter(aliexpressConfig);
     this.openaiAdapter = new OpenAIAdapter(openaiConfig);
     this.syncUseCase = new SyncAliExpressProductsUseCase(
       this.aliexpressAdapter,
@@ -113,9 +155,11 @@ export class AutomatedProductImportUseCase {
       prisma
     );
 
-    // Initialize BullMQ queue
+    // Initialize BullMQ queue with connection string or options
     this.queue = new Queue('product-import', {
-      connection: redisConnection,
+      connection: typeof redisConnection === 'string'
+        ? { url: redisConnection }
+        : redisConnection,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -187,14 +231,26 @@ export class AutomatedProductImportUseCase {
       if (allProductIds.length >= maxProducts) break;
 
       try {
-        const searchResult = await this.aliexpressAdapter.searchProductsDetailed({
+        // Build search params, only including defined values
+        const searchParams: {
+          keywords: string;
+          categoryId?: string;
+          minPrice?: number;
+          maxPrice?: number;
+          minRating?: number;
+          pageSize?: number;
+        } = {
           keywords: keyword,
-          categoryId: options.categoryId,
-          minPrice: options.minPrice,
-          maxPrice: options.maxPrice,
-          minRating: options.minRating ?? 4.0,
+          minRating: options.minRating ?? 3.8,
           pageSize: Math.min(50, maxProducts - allProductIds.length),
-        });
+        };
+
+        // Only add optional params if they have values
+        if (options.categoryId !== undefined) searchParams.categoryId = options.categoryId;
+        if (options.minPrice !== undefined) searchParams.minPrice = options.minPrice;
+        if (options.maxPrice !== undefined) searchParams.maxPrice = options.maxPrice;
+
+        const searchResult = await this.aliexpressAdapter.searchProductsDetailed(searchParams);
 
         const newIds = searchResult.products
           .map(p => p.productId)
@@ -305,7 +361,7 @@ export class AutomatedProductImportUseCase {
     active: number;
     completed: number;
     failed: number;
-    scheduledJobs: Array<{ jobId: string; nextRun: Date | null; pattern: string }>;
+    scheduledJobs: Array<{ jobId: string; nextRun: Date | null; pattern: string | null }>;
   }> {
     const [waiting, active, completed, failed, repeatableJobs] = await Promise.all([
       this.queue.getWaitingCount(),
@@ -323,7 +379,7 @@ export class AutomatedProductImportUseCase {
       scheduledJobs: repeatableJobs.map(job => ({
         jobId: job.id ?? job.key,
         nextRun: job.next ? new Date(job.next) : null,
-        pattern: job.pattern,
+        pattern: job.pattern ?? null,
       })),
     };
   }
@@ -335,7 +391,7 @@ export class AutomatedProductImportUseCase {
   /**
    * Start the background worker
    */
-  startWorker(redisConnection: Redis): void {
+  startWorker(): void {
     if (this.worker) {
       logger.warn('Worker already running');
       return;
@@ -347,7 +403,9 @@ export class AutomatedProductImportUseCase {
         return this.processImportJob(job);
       },
       {
-        connection: redisConnection,
+        connection: typeof this.redisConnection === 'string'
+          ? { url: this.redisConnection }
+          : this.redisConnection,
         concurrency: 1, // Process one job at a time
       }
     );
@@ -408,17 +466,29 @@ export class AutomatedProductImportUseCase {
       message: 'Searching for products on AliExpress...',
     } as ImportProgress);
 
-    // Search and import products
+    // Search and import products - build options object with only defined values
+    const importOptions: {
+      categoryId?: string;
+      minPrice?: number;
+      maxPrice?: number;
+      minRating?: number;
+      maxProducts?: number;
+      config?: Partial<SyncConfig>;
+    } = {
+      maxProducts: config.maxProducts ?? 50,
+      config: config.syncConfig,
+    };
+
+    // Only add optional params if they have values
+    const firstCategoryId = config.searchParams.categoryIds?.[0];
+    if (firstCategoryId !== undefined) importOptions.categoryId = firstCategoryId;
+    if (config.searchParams.minPrice !== undefined) importOptions.minPrice = config.searchParams.minPrice;
+    if (config.searchParams.maxPrice !== undefined) importOptions.maxPrice = config.searchParams.maxPrice;
+    if (config.searchParams.minRating !== undefined) importOptions.minRating = config.searchParams.minRating;
+
     const syncResult = await this.searchAndImport(
       config.searchParams.keywords,
-      {
-        categoryId: config.searchParams.categoryIds?.[0],
-        minPrice: config.searchParams.minPrice,
-        maxPrice: config.searchParams.maxPrice,
-        minRating: config.searchParams.minRating,
-        maxProducts: config.maxProducts ?? 50,
-        config: config.syncConfig,
-      }
+      importOptions
     );
 
     const completedAt = new Date();
@@ -508,19 +578,20 @@ export class AutomatedProductImportUseCase {
       'skincare-premium': {
         name: 'Premium Skincare Import',
         searchParams: {
-          keywords: ['luxury face serum', 'premium moisturizer', 'vitamin c serum', 'hyaluronic acid'],
-          minPrice: 5,
-          maxPrice: 30,
-          minRating: 4.5,
+          keywords: ['face serum', 'face cream', 'facial moisturizer', 'vitamin c serum', 'hyaluronic acid serum', 'eye cream', 'face mask sheet', 'facial toner'],
+          categoryIds: ['66', '3002'], // Beauty & Health, Skin Care
+          minPrice: 1,
+          maxPrice: 25,
+          minRating: 4.0,
         },
         syncConfig: {
           ...DEFAULT_SYNC_CONFIG,
           pricingStrategy: {
-            markupMultiplier: 3.0,
-            minimumMargin: 0.55,
+            markupMultiplier: 2.8,
+            minimumMargin: 0.45,
           },
         },
-        maxProducts: 30,
+        maxProducts: 60,
         schedule: {
           cron: '0 2 * * 1', // Every Monday at 2 AM
           timezone: 'Europe/Paris',
@@ -529,19 +600,20 @@ export class AutomatedProductImportUseCase {
       'makeup-trending': {
         name: 'Trending Makeup Import',
         searchParams: {
-          keywords: ['lipstick matte', 'eyeshadow palette', 'foundation liquid', 'mascara'],
-          minPrice: 2,
+          keywords: ['lipstick', 'lip gloss', 'mascara', 'eyeliner', 'eyeshadow palette', 'foundation liquid', 'blush powder', 'concealer', 'highlighter makeup', 'contour palette', 'brow pencil'],
+          categoryIds: ['66', '3001'], // Beauty & Health, Makeup
+          minPrice: 1,
           maxPrice: 20,
-          minRating: 4.3,
+          minRating: 4.0,
         },
         syncConfig: {
           ...DEFAULT_SYNC_CONFIG,
           pricingStrategy: {
-            markupMultiplier: 2.8,
-            minimumMargin: 0.50,
+            markupMultiplier: 2.5,
+            minimumMargin: 0.40,
           },
         },
-        maxProducts: 50,
+        maxProducts: 80,
         schedule: {
           cron: '0 3 * * 3', // Every Wednesday at 3 AM
           timezone: 'Europe/Paris',
@@ -550,21 +622,88 @@ export class AutomatedProductImportUseCase {
       'beauty-tools': {
         name: 'Beauty Tools Import',
         searchParams: {
-          keywords: ['makeup brush set', 'beauty blender', 'face roller', 'derma roller'],
-          minPrice: 3,
-          maxPrice: 25,
-          minRating: 4.2,
+          keywords: ['makeup brush set', 'beauty blender sponge', 'face roller jade', 'gua sha', 'makeup mirror led', 'eyelash curler', 'makeup organizer'],
+          categoryIds: ['66'], // Beauty & Health
+          minPrice: 1,
+          maxPrice: 20,
+          minRating: 4.0,
         },
         syncConfig: {
           ...DEFAULT_SYNC_CONFIG,
           pricingStrategy: {
             markupMultiplier: 2.5,
-            minimumMargin: 0.45,
+            minimumMargin: 0.40,
+          },
+        },
+        maxProducts: 50,
+        schedule: {
+          cron: '0 4 * * 5', // Every Friday at 4 AM
+          timezone: 'Europe/Paris',
+        },
+      },
+      'nail-art': {
+        name: 'Nail Art Import',
+        searchParams: {
+          keywords: ['nail polish', 'nail art set', 'gel nail kit', 'nail stickers', 'nail tools'],
+          categoryIds: ['66', '3004'], // Beauty & Health, Nail Art
+          minPrice: 1,
+          maxPrice: 15,
+          minRating: 4.0,
+        },
+        syncConfig: {
+          ...DEFAULT_SYNC_CONFIG,
+          pricingStrategy: {
+            markupMultiplier: 2.5,
+            minimumMargin: 0.40,
           },
         },
         maxProducts: 40,
         schedule: {
-          cron: '0 4 * * 5', // Every Friday at 4 AM
+          cron: '0 5 * * 2', // Every Tuesday at 5 AM
+          timezone: 'Europe/Paris',
+        },
+      },
+      'hair-care': {
+        name: 'Hair Care Import',
+        searchParams: {
+          keywords: ['hair serum', 'hair mask', 'hair oil treatment', 'hair brush', 'scalp massager'],
+          categoryIds: ['66', '3003'], // Beauty & Health, Hair Care
+          minPrice: 1,
+          maxPrice: 20,
+          minRating: 4.0,
+        },
+        syncConfig: {
+          ...DEFAULT_SYNC_CONFIG,
+          pricingStrategy: {
+            markupMultiplier: 2.5,
+            minimumMargin: 0.40,
+          },
+        },
+        maxProducts: 40,
+        schedule: {
+          cron: '0 6 * * 4', // Every Thursday at 6 AM
+          timezone: 'Europe/Paris',
+        },
+      },
+      'body-care': {
+        name: 'Body Care Import',
+        searchParams: {
+          keywords: ['body lotion', 'hand cream', 'body scrub', 'body mist', 'shower gel'],
+          categoryIds: ['66'], // Beauty & Health
+          minPrice: 1,
+          maxPrice: 15,
+          minRating: 4.0,
+        },
+        syncConfig: {
+          ...DEFAULT_SYNC_CONFIG,
+          pricingStrategy: {
+            markupMultiplier: 2.5,
+            minimumMargin: 0.40,
+          },
+        },
+        maxProducts: 40,
+        schedule: {
+          cron: '0 7 * * 6', // Every Saturday at 7 AM
           timezone: 'Europe/Paris',
         },
       },
@@ -582,15 +721,16 @@ export function createAutomatedImportUseCase(
   aliexpressConfig: AliExpressConfig,
   openaiConfig: OpenAIConfig
 ): AutomatedProductImportUseCase {
-  const redis = new Redis(redisUrl);
   const prisma = new PrismaClient({
     datasources: {
       db: { url: databaseUrl },
     },
   });
 
+  // Pass the Redis URL directly instead of a Redis instance
+  // BullMQ handles the connection internally
   return new AutomatedProductImportUseCase(
-    redis,
+    redisUrl,
     prisma,
     aliexpressConfig,
     openaiConfig

@@ -6,7 +6,7 @@ export interface OrderRepository {
   findByOrderNumber(orderNumber: string): Promise<Order | null>;
   findByCustomerId(customerId: UUID, pagination: PaginationParams): Promise<PaginatedResult<Order>>;
   findByStatus(status: OrderStatus, pagination: PaginationParams): Promise<PaginatedResult<Order>>;
-  findByStripePaymentIntentId(paymentIntentId: string): Promise<Order | null>;
+  findByHypTransactionId(transactionId: string): Promise<Order | null>;
   findPendingOrders(): Promise<Order[]>;
   findOrdersToProcess(): Promise<Order[]>;
   findAll(pagination: PaginationParams): Promise<PaginatedResult<Order>>;

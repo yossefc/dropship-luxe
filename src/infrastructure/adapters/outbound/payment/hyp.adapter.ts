@@ -215,13 +215,13 @@ export class HypAdapter implements PaymentGateway {
   async createPaymentIntent(params: CreatePaymentIntentParams): Promise<PaymentIntentResult> {
     this.logger.info('Creating Hyp payment intent', {
       orderId: params.orderId,
-      amount: params.amount.value,
+      amount: params.amount.amount,
       currency: params.amount.currency,
     });
 
     try {
       // Convertir le montant en agorot/centimes (Hyp attend le montant x100)
-      const amountInCents = Math.round(params.amount.value * 100);
+      const amountInCents = Math.round(params.amount.amount * 100);
       const currency = this.mapCurrency(params.amount.currency);
 
       // Générer un ID unique pour cette intention de paiement
@@ -264,7 +264,7 @@ export class HypAdapter implements PaymentGateway {
       // Stocker en cache pour récupération ultérieure
       this.paymentIntentCache.set(paymentIntentId, {
         orderId: params.orderId,
-        amount: params.amount.value,
+        amount: params.amount.amount,
         currency: params.amount.currency,
         status: 'requires_payment_method',
         metadata: params.metadata ?? {},
@@ -281,7 +281,7 @@ export class HypAdapter implements PaymentGateway {
         id: paymentIntentId,
         clientSecret: paymentUrl,  // L'URL de paiement pour redirection
         status: 'requires_payment_method',
-        amount: params.amount.value,
+        amount: params.amount.amount,
         currency: params.amount.currency,
       };
     } catch (error) {
@@ -334,13 +334,13 @@ export class HypAdapter implements PaymentGateway {
   async createRefund(params: RefundParams): Promise<RefundResult> {
     this.logger.info('Creating Hyp refund', {
       paymentIntentId: params.paymentIntentId,
-      amount: params.amount?.value,
+      amount: params.amount?.amount,
     });
 
     try {
       // Récupérer les infos de la transaction originale
       const cached = this.paymentIntentCache.get(params.paymentIntentId);
-      const refundAmount = params.amount?.value ?? cached?.amount ?? 0;
+      const refundAmount = params.amount?.amount ?? cached?.amount ?? 0;
       const amountInCents = Math.round(refundAmount * 100);
 
       // Paramètres pour le remboursement via API Hyp
@@ -438,27 +438,24 @@ export class HypAdapter implements PaymentGateway {
       } else {
         // Parser les données URL-encoded
         const params = new URLSearchParams(payloadString);
-        data = {
+        // Build data object with only defined properties
+        const parsedData: HypWebhookPayload = {
           Id: params.get('Id') ?? '',
           CCode: params.get('CCode') ?? '',
           Amount: params.get('Amount') ?? '',
           ACode: params.get('ACode') ?? '',
           Order: params.get('Order') ?? '',
-          Fild1: params.get('Fild1') ?? undefined,
-          Fild2: params.get('Fild2') ?? undefined,
-          Fild3: params.get('Fild3') ?? undefined,
-          Bank: params.get('Bank') ?? undefined,
-          Payments: params.get('Payments') ?? undefined,
-          UserId: params.get('UserId') ?? undefined,
-          Brand: params.get('Brand') ?? undefined,
-          L4digit: params.get('L4digit') ?? undefined,
-          Hesh: params.get('Hesh') ?? undefined,
-          UID: params.get('UID') ?? undefined,
-          Sign: params.get('Sign') ?? undefined,
-          errMsg: params.get('errMsg') ?? undefined,
-          Coin: params.get('Coin') ?? undefined,
-          J: params.get('J') ?? undefined,
         };
+
+        // Add optional fields only if they have values
+        const optionalFields = ['Fild1', 'Fild2', 'Fild3', 'Bank', 'Payments', 'UserId', 'Brand', 'L4digit', 'Hesh', 'UID', 'Sign', 'errMsg', 'Coin', 'J'] as const;
+        for (const field of optionalFields) {
+          const value = params.get(field);
+          if (value !== null) {
+            (parsedData as unknown as Record<string, string>)[field] = value;
+          }
+        }
+        data = parsedData;
       }
     } catch (error) {
       throw new ValidationError('Invalid webhook payload format');
@@ -665,18 +662,34 @@ export class HypAdapter implements PaymentGateway {
       // Ignorer les erreurs de parsing
     }
 
-    return {
+    const result: {
+      transactionId: string;
+      orderId: string;
+      amount: number;
+      currency: string;
+      status: 'pending' | 'succeeded' | 'failed';
+      cardBrand?: string;
+      cardLast4?: string;
+      authorizationCode?: string;
+      errorMessage?: string;
+      metadata?: Record<string, unknown>;
+    } = {
       transactionId: payload.Id,
       orderId: payload.Order,
       amount,
       currency: CURRENCY_CODES[payload.Coin ?? '1'] ?? 'ILS',
       status: payload.CCode === '0' ? 'succeeded' : 'failed',
-      cardBrand: CARD_BRANDS[payload.Brand ?? ''] ?? undefined,
-      cardLast4: payload.L4digit ?? undefined,
-      authorizationCode: payload.ACode ?? undefined,
-      errorMessage: payload.errMsg ?? undefined,
       metadata,
     };
+
+    // Add optional fields only if they have values
+    const cardBrand = CARD_BRANDS[payload.Brand ?? ''];
+    if (cardBrand) result.cardBrand = cardBrand;
+    if (payload.L4digit) result.cardLast4 = payload.L4digit;
+    if (payload.ACode) result.authorizationCode = payload.ACode;
+    if (payload.errMsg) result.errorMessage = payload.errMsg;
+
+    return result;
   }
 
   /**

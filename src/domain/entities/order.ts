@@ -29,7 +29,7 @@ export interface OrderProps {
   total: Money;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
-  stripePaymentIntentId?: string;
+  hypTransactionId?: string;
   aliexpressOrderIds: string[];
   trackingNumbers: string[];
   notes?: string;
@@ -76,7 +76,7 @@ export class Order {
   get total(): Money { return this.props.total; }
   get status(): OrderStatus { return this.props.status; }
   get paymentStatus(): PaymentStatus { return this.props.paymentStatus; }
-  get stripePaymentIntentId(): string | undefined { return this.props.stripePaymentIntentId; }
+  get hypTransactionId(): string | undefined { return this.props.hypTransactionId; }
   get aliexpressOrderIds(): string[] { return [...this.props.aliexpressOrderIds]; }
   get trackingNumbers(): string[] { return [...this.props.trackingNumbers]; }
   get notes(): string | undefined { return this.props.notes; }
@@ -94,8 +94,8 @@ export class Order {
     return this.props.subtotal.subtract(totalSupplierCost);
   }
 
-  setPaymentIntent(paymentIntentId: string): void {
-    this.props.stripePaymentIntentId = paymentIntentId;
+  setHypTransactionId(transactionId: string): void {
+    this.props.hypTransactionId = transactionId;
     this.props.paymentStatus = 'processing';
     this.props.updatedAt = new Date();
   }
