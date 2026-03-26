@@ -184,12 +184,12 @@ export function calculateProductScore(
 export class ProductImportJob {
   private readonly prisma: PrismaClient;
   private readonly dsAdapter: AliExpressDSAdapter;
-  private readonly openai: OpenAIAdapter;
+  private readonly openai: OpenAIAdapter | null;
 
   constructor(
     prisma: PrismaClient,
     dsAdapter: AliExpressDSAdapter,
-    openai: OpenAIAdapter
+    openai: OpenAIAdapter | null
   ) {
     this.prisma = prisma;
     this.dsAdapter = dsAdapter;
@@ -529,6 +529,11 @@ export class ProductImportJob {
     keywords: string[];
   }> {
     try {
+      // Skip AI translation if OpenAI is not configured
+      if (!this.openai) {
+        throw new Error('OpenAI not configured');
+      }
+
       // Use the OpenAI adapter's luxury translation feature
       const result = await this.openai.generateLuxuryTranslations({
         originalName: title,
@@ -603,7 +608,11 @@ export class ProductImportJob {
 export function createProductImportJob(prisma: PrismaClient): ProductImportJob {
   const oauthService = createAliExpressOAuthService(prisma);
   const dsAdapter = createAliExpressDSAdapter(() => oauthService.getValidAccessToken());
-  const openai = new OpenAIAdapter({ apiKey: env.OPENAI_API_KEY });
+
+  // OpenAI is optional - if not configured, translations will be skipped
+  const openai = env.OPENAI_API_KEY
+    ? new OpenAIAdapter({ apiKey: env.OPENAI_API_KEY })
+    : null;
 
   return new ProductImportJob(prisma, dsAdapter, openai);
 }

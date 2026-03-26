@@ -531,7 +531,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
       redis: { status: 'unhealthy' },
       aliexpress: { status: 'unknown' },
       openai: { status: 'unknown' },
-      hyp: { status: hypAdapter ? 'configured' : 'not_configured', masof: env.HYP_MASOF ? env.HYP_MASOF.substring(0, 4) + '****' : 'N/A' },
+      hyp: { status: hypAdapter ? 'configured' : 'unknown', masof: env.HYP_MASOF ? env.HYP_MASOF.substring(0, 4) + '****' : 'N/A' },
     };
 
     // Database check
@@ -568,7 +568,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
 
     // OpenAI check (assume healthy if adapter is configured)
     health.openai = {
-      status: openaiAdapter ? 'healthy' : 'not_configured',
+      status: openaiAdapter ? 'healthy' : 'unknown',
       lastCheck: new Date().toISOString(),
     };
 
