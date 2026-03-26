@@ -62,6 +62,8 @@ export interface ImportJobConfig {
   priceMultiplier?: number;
   dryRun?: boolean;
   filterCosmetics?: boolean; // Only import cosmetics products
+  useBeautyCategory?: boolean; // Search in Beauty & Health category (recommended for cosmetics)
+  searchKeywords?: string; // Custom search keywords
 }
 
 // Cosmetics-related keywords for filtering
@@ -231,6 +233,8 @@ export class ProductImportJob {
       priceMultiplier = 2.5,
       dryRun = false,
       filterCosmetics = true, // Filter cosmetics by default
+      useBeautyCategory = true, // Use Beauty & Health category by default
+      searchKeywords = 'skincare serum cream moisturizer',
     } = config;
 
     console.log(`[ProductImport] Starting job ${jobId}`, {
@@ -241,6 +245,8 @@ export class ProductImportJob {
       priceMultiplier,
       dryRun,
       filterCosmetics,
+      useBeautyCategory,
+      searchKeywords,
     });
 
     const result: ImportJobResult = {
@@ -257,11 +263,50 @@ export class ProductImportJob {
     };
 
     try {
-      // Fetch products from DS feed
-      const feedProducts = await this.fetchFeedProducts(feedName, maxProducts);
-      result.totalProcessed = feedProducts.length;
+      // Fetch products - either from Beauty category or general feed
+      let feedProducts: DSProductDetails[];
 
-      console.log(`[ProductImport] Fetched ${feedProducts.length} products from feed`);
+      if (useBeautyCategory && this.dsAdapter) {
+        console.log(`[ProductImport] Searching Beauty & Health category with keywords: ${searchKeywords}`);
+        const searchResult = await this.dsAdapter.searchProductsDetailed({
+          keywords: searchKeywords,
+          categoryId: '66', // Beauty & Health
+          pageSize: Math.min(maxProducts, 50),
+        });
+
+        // Convert search results to feed product format
+        feedProducts = searchResult.products.map(p => ({
+          ae_item_base_info_dto: {
+            product_id: parseInt(p.productId, 10),
+            subject: p.title,
+            aeop_ae_product_propertys: [],
+            detail: p.description,
+          },
+          ae_multimedia_info_dto: {
+            image_urls: p.images.join(';'),
+          },
+          ae_item_sku_info_dtos: [],
+          traffic_product_dto: {
+            sale_price: String(p.price.amount),
+            original_price: String(p.price.amount * 1.5),
+            evaluate_rate: String((p.rating ?? 4.5) * 20),
+            orders: p.orderVolume ?? 0,
+          },
+          ae_store_info: {
+            store_name: p.supplierName,
+            positive_rate: '95',
+          },
+          logistics_info_dto: {
+            delivery_time: p.shippingTimeMin?.toString() ?? '7',
+          },
+        }));
+        console.log(`[ProductImport] Found ${feedProducts.length} products in Beauty & Health category`);
+      } else {
+        feedProducts = await this.fetchFeedProducts(feedName, maxProducts);
+      }
+
+      result.totalProcessed = feedProducts.length;
+      console.log(`[ProductImport] Fetched ${feedProducts.length} products`);
 
       let totalScore = 0;
 
