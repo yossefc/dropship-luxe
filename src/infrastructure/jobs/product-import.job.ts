@@ -61,7 +61,26 @@ export interface ImportJobConfig {
   quarantineThreshold?: number;
   priceMultiplier?: number;
   dryRun?: boolean;
+  filterCosmetics?: boolean; // Only import cosmetics products
 }
+
+// Cosmetics-related keywords for filtering
+const COSMETICS_KEYWORDS = [
+  // English
+  'serum', 'cream', 'moisturizer', 'lotion', 'mask', 'cleanser', 'toner',
+  'skincare', 'skin care', 'beauty', 'cosmetic', 'makeup', 'make-up', 'lipstick',
+  'foundation', 'concealer', 'mascara', 'eyeliner', 'eyeshadow', 'blush',
+  'bronzer', 'primer', 'powder', 'facial', 'face', 'anti-aging', 'anti-wrinkle',
+  'moisturizing', 'hydrating', 'vitamin c', 'retinol', 'hyaluronic', 'collagen',
+  'sunscreen', 'spf', 'lip balm', 'lip gloss', 'perfume', 'fragrance',
+  'essence', 'ampoule', 'eye cream', 'night cream', 'day cream', 'bb cream',
+  'cc cream', 'sheet mask', 'peel', 'exfoliant', 'scrub', 'oil', 'body lotion',
+  // French
+  'sérum', 'crème', 'soin', 'visage', 'peau', 'beauté', 'maquillage',
+  'hydratant', 'anti-âge', 'anti-rides', 'lèvres', 'yeux', 'teint',
+  // Product types
+  'skincare set', 'beauty set', 'cosmetic set', 'gift set',
+];
 
 // ============================================================================
 // Product Scoring Algorithm
@@ -211,6 +230,7 @@ export class ProductImportJob {
       quarantineThreshold = 50,
       priceMultiplier = 2.5,
       dryRun = false,
+      filterCosmetics = true, // Filter cosmetics by default
     } = config;
 
     console.log(`[ProductImport] Starting job ${jobId}`, {
@@ -220,6 +240,7 @@ export class ProductImportJob {
       quarantineThreshold,
       priceMultiplier,
       dryRun,
+      filterCosmetics,
     });
 
     const result: ImportJobResult = {
@@ -265,6 +286,25 @@ export class ProductImportJob {
           if (existing) {
             console.log(`[ProductImport] Skipping existing product ${productId}`);
             continue;
+          }
+
+          // Filter for cosmetics products only
+          if (filterCosmetics) {
+            const title = (productData.ae_item_base_info_dto?.subject ?? '').toLowerCase();
+            const isCosmetics = COSMETICS_KEYWORDS.some(keyword => title.includes(keyword.toLowerCase()));
+
+            if (!isCosmetics) {
+              console.log(`[ProductImport] Skipping non-cosmetics product ${productId}: ${title.substring(0, 50)}...`);
+              result.rejectedCount++;
+              result.products.push({
+                aliexpressId: productId,
+                title: productData.ae_item_base_info_dto?.subject ?? 'Unknown',
+                score: 0,
+                status: 'rejected',
+                reason: 'Not a cosmetics product',
+              });
+              continue;
+            }
           }
 
           // Calculate shipping cost (default estimate)
