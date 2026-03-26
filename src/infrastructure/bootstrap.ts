@@ -1067,6 +1067,45 @@ export async function bootstrap(): Promise<BootstrapResult> {
     logger.warn('Tracking sync cron task NOT registered - AliExpress not configured');
   }
 
+  // Import automatique de nouveaux produits AliExpress (toutes les 24h à 3h du matin)
+  if (env.ALIEXPRESS_APP_KEY && env.ALIEXPRESS_APP_SECRET) {
+    cronScheduler.registerTask({
+      name: 'product-import',
+      schedule: '0 3 * * *',  // Tous les jours à 3h du matin
+      handler: async () => {
+        logger.info('Starting automatic product import from AliExpress...');
+
+        try {
+          const result = await productImportJob.execute({
+            feedName: 'DS_France_topsellers',
+            maxProducts: 30,  // Importer jusqu'à 30 nouveaux produits par jour
+            minScore: 65,     // Score minimum pour import
+            quarantineThreshold: 50,
+            priceMultiplier: 2.5,
+            dryRun: false,
+          });
+
+          lastImportResult = result;
+
+          logger.info('Automatic product import completed', {
+            totalProcessed: result.totalProcessed,
+            imported: result.importedCount,
+            quarantined: result.quarantinedCount,
+            rejected: result.rejectedCount,
+            errors: result.errorCount,
+            averageScore: result.averageScore,
+          });
+        } catch (error) {
+          logger.error('Automatic product import failed', {
+            error: error instanceof Error ? error.message : 'Unknown',
+          });
+        }
+      },
+    });
+  } else {
+    logger.warn('Product import cron task NOT registered - AliExpress not configured');
+  }
+
   // Nettoyage des données anciennes (quotidien à minuit)
   cronScheduler.registerTask({
     name: 'data-cleanup',

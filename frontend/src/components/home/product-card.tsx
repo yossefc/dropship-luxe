@@ -7,6 +7,7 @@ import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { Heart, ShoppingBag, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn, formatPrice } from '@/lib/utils';
+import { useLocale } from 'next-intl';
 
 export interface ProductCardData {
   id: string;
@@ -39,6 +40,7 @@ export function ProductCard({
   const [isWishlisted, setIsWishlisted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: '-50px' });
+  const locale = useLocale();
 
   const discount = product.originalPrice != null
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
@@ -55,7 +57,7 @@ export function ProductCard({
       className="group relative flex flex-col"
     >
       {/* Image Container */}
-      <Link href={`/products/${product.slug}`} className="relative block">
+      <Link href={`/${locale}/products/${product.slug}`} className="relative block">
         <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-neutral-100" style={{ position: 'relative' }}>
           {/* Main Image */}
           <Image
@@ -158,7 +160,7 @@ export function ProductCard({
           {product.brand}
         </span>
 
-        <Link href={`/products/${product.slug}`}>
+        <Link href={`/${locale}/products/${product.slug}`}>
           <h3 className="font-heading text-lg font-medium text-primary-800 leading-snug line-clamp-2 hover:text-accent-gold transition-colors">
             {product.name}
           </h3>

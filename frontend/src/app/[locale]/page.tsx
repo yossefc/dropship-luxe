@@ -141,19 +141,25 @@ export default function HomePage(): JSX.Element {
         const data = await res.json();
 
         if (data.success && data.data?.length > 0) {
-          const mappedProducts: ProductCardData[] = data.data.slice(0, 8).map((p: ApiProduct) => ({
-            id: p.id,
-            slug: p.translations?.[0]?.slug || p.aliexpressId,
-            name: p.translations?.[0]?.name || p.name,
-            brand: p.supplierName || 'Dropship Luxe',
-            price: p.sellingPrice,
-            originalPrice: p.basePrice > p.sellingPrice ? p.basePrice * 2.5 : undefined,
-            currency: p.currency || 'EUR',
-            image: p.images?.[0] || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=800&fit=crop',
-            hoverImage: p.images?.[1],
-            badge: p.importScore >= 90 ? 'bestseller' : p.importScore >= 80 ? 'new' : undefined,
-            rating: p.rating || 4.5,
-          }));
+          const mappedProducts: ProductCardData[] = data.data.slice(0, 8).map((p: ApiProduct) => {
+            // Calculer le prix original "barré" (environ 25% de plus que le prix de vente)
+            const originalPriceValue = Math.round(p.sellingPrice * 1.25);
+
+            return {
+              id: p.id,
+              slug: p.translations?.[0]?.slug || p.aliexpressId,
+              name: p.translations?.[0]?.name || p.name,
+              brand: p.supplierName || 'Hayoss',
+              price: p.sellingPrice,
+              // Afficher le prix original barré seulement pour certains produits (top scorers)
+              originalPrice: p.importScore >= 75 ? originalPriceValue : undefined,
+              currency: p.currency || 'EUR',
+              image: p.images?.[0] || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=800&fit=crop',
+              hoverImage: p.images?.[1],
+              badge: p.importScore >= 90 ? 'bestseller' : p.importScore >= 80 ? 'new' : undefined,
+              rating: p.rating || 4.5,
+            };
+          });
           setProducts(mappedProducts);
         }
       } catch (error) {
