@@ -19,7 +19,7 @@ const fallbackProducts: ProductCardData[] = [
     id: '1',
     slug: 'serum-eclat-vitamine-c',
     name: 'Sérum Éclat Vitamine C',
-    brand: 'La Maison',
+    brand: 'Hayoss',
     price: 89,
     originalPrice: 119,
     currency: 'EUR',
@@ -32,12 +32,79 @@ const fallbackProducts: ProductCardData[] = [
     id: '2',
     slug: 'creme-nuit-regenerante',
     name: 'Crème Nuit Régénérante',
-    brand: 'La Maison',
+    brand: 'Hayoss',
     price: 125,
     currency: 'EUR',
     image: 'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=600&h=800&fit=crop',
     badge: 'new',
     rating: 4.9,
+  },
+  {
+    id: '3',
+    slug: 'huile-visage-rose-musquee',
+    name: 'Huile Visage Rose Musquée',
+    brand: 'Hayoss',
+    price: 75,
+    originalPrice: 95,
+    currency: 'EUR',
+    image: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=600&h=800&fit=crop',
+    hoverImage: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=600&h=800&fit=crop',
+    rating: 4.7,
+  },
+  {
+    id: '4',
+    slug: 'masque-hydratant-aloe',
+    name: 'Masque Hydratant Aloe Vera',
+    brand: 'Hayoss',
+    price: 45,
+    currency: 'EUR',
+    image: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=600&h=800&fit=crop',
+    badge: 'new',
+    rating: 4.6,
+  },
+  {
+    id: '5',
+    slug: 'lotion-tonique-purifiante',
+    name: 'Lotion Tonique Purifiante',
+    brand: 'Hayoss',
+    price: 55,
+    originalPrice: 70,
+    currency: 'EUR',
+    image: 'https://images.unsplash.com/photo-1570194065650-d99fb4b38b15?w=600&h=800&fit=crop',
+    rating: 4.5,
+  },
+  {
+    id: '6',
+    slug: 'creme-contour-yeux',
+    name: 'Crème Contour des Yeux',
+    brand: 'Hayoss',
+    price: 98,
+    currency: 'EUR',
+    image: 'https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?w=600&h=800&fit=crop',
+    badge: 'bestseller',
+    rating: 4.9,
+  },
+  {
+    id: '7',
+    slug: 'gommage-doux-visage',
+    name: 'Gommage Doux Visage',
+    brand: 'Hayoss',
+    price: 42,
+    originalPrice: 55,
+    currency: 'EUR',
+    image: 'https://images.unsplash.com/photo-1598452963314-b09f397a5c48?w=600&h=800&fit=crop',
+    rating: 4.4,
+  },
+  {
+    id: '8',
+    slug: 'baume-levres-nourrissant',
+    name: 'Baume Lèvres Nourrissant',
+    brand: 'Hayoss',
+    price: 28,
+    currency: 'EUR',
+    image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=600&h=800&fit=crop',
+    badge: 'new',
+    rating: 4.8,
   },
 ];
 
@@ -112,10 +179,10 @@ export default function HomePage(): JSX.Element {
             <Link href="/collections" className="text-sm font-accent font-medium tracking-wide hover:text-accent-gold transition-colors">
               {t('common.nav.collections')}
             </Link>
-            <Link href="/skincare" className="text-sm font-accent font-medium tracking-wide hover:text-accent-gold transition-colors">
+            <Link href="/collections/skincare" className="text-sm font-accent font-medium tracking-wide hover:text-accent-gold transition-colors">
               {t('common.nav.skincare')}
             </Link>
-            <Link href="/makeup" className="text-sm font-accent font-medium tracking-wide hover:text-accent-gold transition-colors">
+            <Link href="/collections/makeup" className="text-sm font-accent font-medium tracking-wide hover:text-accent-gold transition-colors">
               {t('common.nav.makeup')}
             </Link>
           </div>
@@ -149,7 +216,7 @@ export default function HomePage(): JSX.Element {
             src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&h=800&fit=crop"
             alt={t('common.nav.skincare')}
             title={t('common.nav.skincare')}
-            href="/skincare"
+            href="/collections/skincare"
           />
           <BentoTextCell
             title={t('home.philosophy.title')}
@@ -220,14 +287,14 @@ export default function HomePage(): JSX.Element {
             alt={t('home.categories.skincare.title')}
             title={t('home.categories.skincare.title')}
             subtitle={t('home.categories.skincare.subtitle')}
-            href="/skincare/face"
+            href="/collections/skincare"
             span="featured"
           />
           <BentoImageCell
             src="https://images.unsplash.com/photo-1571875257727-256c39da42af?w=600&h=400&fit=crop"
             alt={t('home.categories.makeup.title')}
             title={t('home.categories.makeup.title')}
-            href="/makeup"
+            href="/collections/makeup"
           />
           <BentoTextCell
             title={t('home.shipping.title')}
@@ -239,7 +306,7 @@ export default function HomePage(): JSX.Element {
             src="https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=600&h=400&fit=crop"
             alt={t('home.categories.fragrances.title')}
             title={t('home.categories.fragrances.title')}
-            href="/fragrances"
+            href="/collections/body-care"
           />
         </BentoContainer>
       </section>

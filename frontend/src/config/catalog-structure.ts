@@ -947,9 +947,10 @@ export function getAllSubCategories(): SubCategory[] {
   return fullCatalog.flatMap(cat => cat.subCategories);
 }
 
-// Helper pour obtenir une catégorie par slug
+// Helper pour obtenir une catégorie par slug ou ID (pour compatibilité URL)
 export function getCategoryBySlug(slug: string): Category | undefined {
-  return fullCatalog.find(cat => cat.slug === slug);
+  // Check by slug first, then by ID for URL compatibility
+  return fullCatalog.find(cat => cat.slug === slug || cat.id === slug);
 }
 
 // Helper pour obtenir une sous-catégorie par slug
