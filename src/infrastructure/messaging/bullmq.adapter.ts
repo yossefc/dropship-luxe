@@ -11,6 +11,7 @@ export interface BullMQConfig {
   redisHost: string;
   redisPort: number;
   redisPassword?: string;
+  redisTls?: boolean;  // Enable TLS for secure connections (e.g., Upstash)
   defaultJobOptions?: QueueOptions;
 }
 
@@ -28,6 +29,7 @@ export class BullMQAdapter implements MessageQueue {
       port: config.redisPort,
       maxRetriesPerRequest: null,
       ...(config.redisPassword != null ? { password: config.redisPassword } : {}),
+      ...(config.redisTls ? { tls: {} } : {}),
     };
 
     this.logger = logger;

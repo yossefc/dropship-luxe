@@ -95,20 +95,40 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // ==========================================================================
   // 2. Initialize Redis Connection
   // ==========================================================================
+  // Parse REDIS_URL if provided, otherwise use individual config
+  let redisHost = env.REDIS_HOST;
+  let redisPort = env.REDIS_PORT;
+  let redisPassword: string | undefined = env.REDIS_PASSWORD;
+
+  if (env.REDIS_URL) {
+    try {
+      const redisUrl = new URL(env.REDIS_URL);
+      redisHost = redisUrl.hostname;
+      redisPort = parseInt(redisUrl.port, 10) || 6379;
+      redisPassword = redisUrl.password || undefined;
+      logger.info('Using REDIS_URL for connection', { host: redisHost, port: redisPort });
+    } catch (error) {
+      logger.error('Failed to parse REDIS_URL, falling back to REDIS_HOST/PORT', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  }
+
   // Connection options for BullMQ (shared configuration)
   const bullmqConnectionOptions = {
-    host: env.REDIS_HOST,
-    port: env.REDIS_PORT,
-    password: env.REDIS_PASSWORD ?? undefined,
+    host: redisHost,
+    port: redisPort,
+    password: redisPassword,
     maxRetriesPerRequest: null,  // Required for BullMQ
     enableReadyCheck: false,
+    tls: env.REDIS_URL?.startsWith('rediss://') ? {} : undefined,  // Enable TLS for rediss:// URLs
   };
 
   // Separate Redis connection for non-BullMQ operations
   const redisConnection = new Redis(bullmqConnectionOptions);
 
   redisConnection.on('connect', () => {
-    logger.info('Redis connected', { host: env.REDIS_HOST, port: env.REDIS_PORT });
+    logger.info('Redis connected', { host: redisHost, port: redisPort });
   });
 
   redisConnection.on('error', (error) => {
@@ -118,11 +138,13 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // ==========================================================================
   // 3. Initialize Message Queue (BullMQ)
   // ==========================================================================
+  const redisTls = env.REDIS_URL?.startsWith('rediss://') ?? false;
   const messageQueue = new BullMQAdapter(
     {
-      redisHost: env.REDIS_HOST,
-      redisPort: env.REDIS_PORT,
-      ...(env.REDIS_PASSWORD != null ? { redisPassword: env.REDIS_PASSWORD } : {}),
+      redisHost,
+      redisPort,
+      ...(redisPassword != null ? { redisPassword } : {}),
+      ...(redisTls ? { redisTls: true } : {}),
     },
     logger
   );
