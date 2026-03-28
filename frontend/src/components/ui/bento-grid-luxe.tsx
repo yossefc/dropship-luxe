@@ -382,7 +382,8 @@ export function BentoProductCell({
   rating,
   span = 'default',
   className,
-}: BentoProductCellProps) {
+  locale = 'fr',
+}: BentoProductCellProps & { locale?: string }) {
   const badgeStyles = {
     new: 'bg-[#1A1A1A] text-white',
     bestseller: 'bg-[#C9A962] text-[#1A1A1A]',
@@ -413,7 +414,7 @@ export function BentoProductCell({
         className
       )}
     >
-      <Link href={`/products/${slug}`} className="block">
+      <Link href={`/${locale}/products/${slug}`} className="block">
         {/* Image Container */}
         <div className="relative aspect-[3/4] overflow-hidden rounded-lg bg-[#F5F4F2] mb-4">
           <Image

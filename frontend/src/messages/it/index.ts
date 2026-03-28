@@ -3,6 +3,7 @@ import home from './home.json';
 import products from './products.json';
 import cart from './cart.json';
 import checkout from './checkout.json';
+import newArrivals from './newArrivals.json';
 
 const messages = {
   common,
@@ -10,6 +11,7 @@ const messages = {
   products,
   cart,
   checkout,
+  newArrivals,
 };
 
 export default messages;

@@ -70,8 +70,8 @@ export default function HomePage(): JSX.Element {
 
             return {
               id: p.id,
-              slug: p.translations?.[0]?.slug || p.aliexpressId,
-              name: p.translations?.[0]?.name || p.name,
+              slug: p.slug || p.aliexpressId,
+              name: p.name,
               brand: p.supplierName || 'Hayoss',
               price: p.sellingPrice,
               // Afficher le prix original barré seulement pour certains produits (top scorers)

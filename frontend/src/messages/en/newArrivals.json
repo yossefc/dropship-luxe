@@ -1,0 +1,16 @@
+{
+  "title": "New Arrivals",
+  "subtitle": "Collection",
+  "description": "Discover our latest curated selection of premium beauty products, handpicked for their exceptional quality and effectiveness.",
+  "metaTitle": "New Arrivals | Hayoss - Luxury Beauty",
+  "metaDescription": "Discover the latest premium beauty products at Hayoss. Exclusive selection of high-end skincare and cosmetics.",
+  "topQuality": "TOP QUALITY",
+  "new": "NEW",
+  "noProducts": "No new arrivals yet. Check back soon for our latest products.",
+  "newsletter": {
+    "title": "Be the First to Know",
+    "description": "Subscribe to receive exclusive access to new arrivals, special offers, and beauty insights curated just for you.",
+    "placeholder": "Enter your email",
+    "submit": "SUBSCRIBE"
+  }
+}

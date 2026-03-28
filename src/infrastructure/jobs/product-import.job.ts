@@ -67,23 +67,29 @@ export interface ImportJobConfig {
   page?: number; // Page number for pagination
 }
 
-// Cosmetics-related keywords for filtering
+// ============================================================================
+// GLOBAL ENGLISH KEYWORDS - For International Best-Sellers Sourcing
+// ============================================================================
+// Using English keywords to search global AliExpress servers (USA, Europe, Asia)
+// This maximizes product variety and finds international best-sellers
+
 const COSMETICS_KEYWORDS = [
-  // Skincare
+  // Skincare - Premium English terms
   'serum', 'cream', 'moisturizer', 'lotion', 'mask', 'cleanser', 'toner',
   'skincare', 'skin care', 'facial', 'face', 'anti-aging', 'anti-wrinkle',
   'moisturizing', 'hydrating', 'vitamin c', 'retinol', 'hyaluronic', 'collagen',
   'sunscreen', 'spf', 'essence', 'ampoule', 'eye cream', 'night cream', 'day cream',
   'bb cream', 'cc cream', 'sheet mask', 'peel', 'exfoliant', 'scrub', 'body lotion',
-  // Makeup
+  'niacinamide', 'peptide', 'ceramide', 'snail mucin', 'centella', 'squalane',
+  // Makeup - Global terms
   'beauty', 'cosmetic', 'makeup', 'make-up', 'lipstick', 'lip gloss', 'lip tint',
   'foundation', 'concealer', 'mascara', 'eyeliner', 'eyeshadow', 'blush',
   'bronzer', 'primer', 'powder', 'highlighter', 'contour', 'brow', 'eyebrow',
-  'lip balm', 'lipliner', 'lipgloss', 'rouge', 'palette',
-  // Nails - IMPORTANT: Include nail products
+  'lip balm', 'lipliner', 'lipgloss', 'rouge', 'palette', 'setting spray',
+  // Nails
   'nail', 'nail polish', 'gel nail', 'manicure', 'pedicure', 'nail art',
   'gel polish', 'nail gel', 'nail varnish', 'false nail', 'fake nail', 'press on nail',
-  // Eyelashes - IMPORTANT: Include lash products
+  // Eyelashes
   'eyelash', 'lash', 'lashes', 'false lash', 'fake lash', 'lash extension',
   'eyelash extension', 'lash glue', 'eyelash glue', 'premade fan', 'volume lash',
   // Hair & Body
@@ -92,11 +98,34 @@ const COSMETICS_KEYWORDS = [
   // Tools
   'makeup brush', 'beauty sponge', 'blender', 'puff', 'applicator', 'beauty tool',
   'curler', 'tweezers', 'mirror', 'organizer', 'cotton pad',
-  // French
-  'sérum', 'crème', 'soin', 'visage', 'peau', 'beauté', 'maquillage',
-  'hydratant', 'anti-âge', 'anti-rides', 'lèvres', 'yeux', 'teint', 'vernis', 'ongle',
   // Product types
-  'skincare set', 'beauty set', 'cosmetic set', 'gift set',
+  'skincare set', 'beauty set', 'cosmetic set', 'gift set', 'luxury',
+];
+
+// ============================================================================
+// GLOBAL SEARCH KEYWORDS - English only for best international results
+// ============================================================================
+// Rotation of search terms to diversify product imports
+
+const GLOBAL_SEARCH_KEYWORDS_ROTATION = [
+  // Best-seller searches
+  'luxury skincare serum bestseller',
+  'premium face cream moisturizer',
+  'korean skincare k-beauty',
+  'professional makeup palette',
+  'organic natural beauty',
+  'anti aging vitamin c serum',
+  'hyaluronic acid moisturizer',
+  'retinol night cream',
+  'niacinamide pore minimizer',
+  'collagen face mask',
+  'lip gloss lipstick matte',
+  'foundation concealer makeup',
+  'eyelash extension kit',
+  'nail gel polish professional',
+  'perfume fragrance women',
+  'makeup brush set professional',
+  'beauty gift set luxury',
 ];
 
 // ============================================================================
@@ -240,6 +269,10 @@ export class ProductImportJob {
     const jobId = uuidv4();
     const startTime = Date.now();
 
+    // Select random global search keywords for diversity
+    const randomKeywordIndex = Math.floor(Math.random() * GLOBAL_SEARCH_KEYWORDS_ROTATION.length);
+    const defaultGlobalKeywords = GLOBAL_SEARCH_KEYWORDS_ROTATION[randomKeywordIndex];
+
     const {
       feedName = 'DS_France_topsellers',
       maxProducts = 20,
@@ -249,7 +282,7 @@ export class ProductImportJob {
       dryRun = false,
       filterCosmetics = true, // Filter cosmetics by default
       useBeautyCategory = true, // Use Beauty & Health category by default
-      searchKeywords = 'skincare serum cream moisturizer lipstick nail polish eyelash',
+      searchKeywords = defaultGlobalKeywords, // Use English global keywords by default
       page = 1, // Page number for pagination
     } = config;
 

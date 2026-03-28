@@ -78,11 +78,73 @@ const COSMETIC_CATEGORIES = [
 export class ProductScoreCalculator {
   private readonly minScoreForImport = 50; // Reduced threshold to import more cosmetic products
 
+  // ============================================================================
+  // HARD RULES - Minimum Requirements (Instant Rejection)
+  // ============================================================================
+  private readonly MIN_ORDERS_REQUIRED = 50;
+  private readonly MIN_REVIEWS_REQUIRED = 50;
+
+  /**
+   * Check hard rules - instant rejection if not met
+   * These are non-negotiable minimum requirements for product quality
+   */
+  private checkHardRules(product: AliExpressProductData): { passed: boolean; reason?: string } {
+    // Hard Rule 1: Minimum 50 orders
+    if (product.orderCount < this.MIN_ORDERS_REQUIRED) {
+      return {
+        passed: false,
+        reason: `HARD_RULE_VIOLATION: Insufficient orders (${product.orderCount} < ${this.MIN_ORDERS_REQUIRED} minimum). Product rejected.`,
+      };
+    }
+
+    // Hard Rule 2: Minimum 50 reviews
+    if (product.reviewCount < this.MIN_REVIEWS_REQUIRED) {
+      return {
+        passed: false,
+        reason: `HARD_RULE_VIOLATION: Insufficient reviews (${product.reviewCount} < ${this.MIN_REVIEWS_REQUIRED} minimum). Product rejected.`,
+      };
+    }
+
+    return { passed: true };
+  }
+
   /**
    * Calculate the complete product score
    */
   calculate(input: ProductScoreInput): ProductScoreResult {
     const { product, shippingCost, targetSellingPrice } = input;
+
+    // ========================================================================
+    // HARD RULES CHECK - Instant rejection before any scoring
+    // ========================================================================
+    const hardRuleCheck = this.checkHardRules(product);
+    if (!hardRuleCheck.passed) {
+      // Return zero score with rejection reason
+      return {
+        totalScore: 0,
+        recommendation: 'NOT_RECOMMENDED',
+        breakdown: {
+          profitMarginScore: 0,
+          marketDemandScore: 0,
+          logisticsScore: 0,
+          complianceScore: 0,
+          supplierQualityScore: 0,
+          competitivenessScore: 0,
+        },
+        profitability: {
+          costPrice: product.price,
+          shippingCost,
+          totalCost: product.price + shippingCost,
+          sellingPrice: targetSellingPrice,
+          grossProfit: 0,
+          profitMargin: 0,
+          breakEvenUnits: Infinity,
+        },
+        riskFactors: [hardRuleCheck.reason!],
+        shouldImport: false,
+      };
+    }
+    // ========================================================================
 
     // Calculate profitability metrics
     const profitability = this.calculateProfitability(

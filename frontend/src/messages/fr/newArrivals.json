@@ -1,0 +1,16 @@
+{
+  "title": "Nouveautes",
+  "subtitle": "Collection",
+  "description": "Decouvrez notre derniere selection de produits de beaute premium, soigneusement choisis pour leur qualite exceptionnelle et leur efficacite.",
+  "metaTitle": "Nouveautes | Hayoss - Beaute de Luxe",
+  "metaDescription": "Decouvrez les derniers produits de beaute premium sur Hayoss. Selection exclusive de soins et cosmetiques haut de gamme.",
+  "topQuality": "QUALITE SUPERIEURE",
+  "new": "NOUVEAU",
+  "noProducts": "Pas encore de nouveautes. Revenez bientot pour decouvrir nos derniers produits.",
+  "newsletter": {
+    "title": "Soyez les Premiers Informes",
+    "description": "Inscrivez-vous pour recevoir en exclusivite nos nouveautes, offres speciales et conseils beaute.",
+    "placeholder": "Votre adresse email",
+    "submit": "S'INSCRIRE"
+  }
+}

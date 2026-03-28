@@ -1461,12 +1461,58 @@ export class AliExpressDSAdapter implements SupplierApi {
     const packageInfo = product.package_info_dto;
     const logisticsInfo = product.logistics_info_dto;
 
-    // Parse images
+    // ========================================================================
+    // HD IMAGES EXTRACTION - Get all images in highest resolution
+    // ========================================================================
     const images: string[] = [];
+    const seenUrls = new Set<string>();
+
+    // Helper to convert to HD URL (remove size suffixes, use original)
+    const toHdUrl = (url: string): string => {
+      if (!url) return '';
+      // Remove common AliExpress size suffixes to get original HD image
+      // Patterns: _120x120.jpg, _220x220.jpg, _350x350.jpg, _640x640.jpg, etc.
+      let hdUrl = url.replace(/_\d+x\d+(\.\w+)$/, '$1');
+      // Also handle _.webp suffixes
+      hdUrl = hdUrl.replace(/_\d+x\d+\.webp$/, '.jpg');
+      // Ensure HTTPS
+      if (hdUrl.startsWith('//')) {
+        hdUrl = 'https:' + hdUrl;
+      }
+      return hdUrl;
+    };
+
+    // 1. Extract main gallery images from image_urls (primary source)
     if (mediaInfo?.image_urls) {
       const urls = mediaInfo.image_urls.split(';').filter(Boolean);
-      images.push(...urls);
+      for (const url of urls) {
+        const hdUrl = toHdUrl(url);
+        if (hdUrl && !seenUrls.has(hdUrl)) {
+          seenUrls.add(hdUrl);
+          images.push(hdUrl);
+        }
+      }
     }
+
+    // 2. Extract SKU/variant images (secondary source - color variations, etc.)
+    const skuImages: string[] = [];
+    for (const sku of skuInfo) {
+      const skuProps = sku.ae_sku_property_dtos?.ae_sku_property_d_t_o ?? [];
+      for (const prop of skuProps) {
+        if (prop.sku_image) {
+          const hdUrl = toHdUrl(prop.sku_image);
+          if (hdUrl && !seenUrls.has(hdUrl)) {
+            seenUrls.add(hdUrl);
+            skuImages.push(hdUrl);
+          }
+        }
+      }
+    }
+    // Add SKU images after main images
+    images.push(...skuImages);
+
+    console.log(`[AliExpress DS] Extracted ${images.length} HD images (${images.length - skuImages.length} main + ${skuImages.length} SKU)`);
+    // ========================================================================
 
     // Parse variants
     const variants: ProductVariant[] = skuInfo.map(sku => ({
