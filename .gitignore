@@ -56,8 +56,20 @@ prisma/migrations/
 # Docker
 .docker/
 
+# Next.js
+frontend/.next/
+
 # Misc
 *.bak
 *.tmp
 *.temp
 .cache/
+nul
+
+# Test/dev scripts
+test-*.ts
+test-*.js
+get-categories.ts
+
+# Frontend public generated images
+frontend/public/products/
