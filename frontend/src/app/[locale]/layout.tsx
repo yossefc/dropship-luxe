@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { locales, type Locale, localeSeoConfig } from '@/i18n/config';
 import { CartProvider } from '@/components/cart/cart-provider';
+import { LuxeNavbar } from '@/components/navigation';
 
 // Generate static params for all locales
 export function generateStaticParams() {
@@ -89,7 +90,10 @@ export default async function LocaleLayout({
   return (
     <NextIntlClientProvider messages={messages}>
       <CartProvider>
-        {children}
+        <LuxeNavbar />
+        <div className="pt-[88px]">
+          {children}
+        </div>
       </CartProvider>
     </NextIntlClientProvider>
   );

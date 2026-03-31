@@ -119,110 +119,135 @@ export default function HomePage(): JSX.Element {
     fetchProducts();
   }, []);
 
+  // Group products by parent category
+  const soinsProducts = products.filter(p => p.category === 'soins').slice(0, 4);
+  const maquillageProducts = products.filter(p => p.category === 'maquillage').slice(0, 4);
+  const parfumsProducts = products.filter(p => p.category === 'parfums').slice(0, 4);
+
   return (
     <main className="min-h-screen bg-white">
-      {/* Navigation - Luxe Mega Menu */}
-      <LuxeNavbar />
-
-      {/* Hero Section with Video */}
-      <HeroSection
-        title={t('home.hero.title')}
-        subtitle={t('home.hero.overline')}
-        ctaText={t('common.cta.shopNow')}
-        ctaHref="/collections"
-        secondaryCtaText={t('common.cta.learnMore')}
-        secondaryCtaHref="/about"
-      />
-
-      {/* Logo Carousel - Press & Certifications */}
-      <LogoCarousel title="As Featured In" />
-
-      {/* Featured Products with Tabs */}
-      {loading ? (
-        <section className="py-10">
-          <div className="flex justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-accent-gold" />
-          </div>
-        </section>
-      ) : (
-        <FeaturedProductsTabs
-          title={t('home.featured.title')}
-          subtitle={t('home.featured.overline')}
-          products={products}
+      {/* Hero — compact like Clinique */}
+      <section className="relative h-[30vh] min-h-[220px] max-h-[320px] overflow-hidden bg-[#F5F0EB]">
+        <img
+          src="https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1400&h=500&fit=crop"
+          alt="Hayoss"
+          className="absolute inset-0 w-full h-full object-cover"
         />
-      )}
-
-      {/* Categories Bento */}
-      <section className="py-10 bg-neutral-100">
-        <BentoContainer layout="featured">
-          <BentoImageCell
-            src="https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&h=1200&fit=crop"
-            alt="Soins"
-            title="Soins"
-            subtitle="Sérums, crèmes & rituels beauté"
-            href="/collections/soins"
-            span="featured"
-          />
-          <BentoImageCell
-            src="https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=600&h=400&fit=crop"
-            alt="Maquillage"
-            title="Maquillage"
-            href="/collections/maquillage"
-          />
-          <BentoTextCell
-            title={t('home.shipping.title')}
-            description={t('home.shipping.description')}
-            variant="gold"
-            align="center"
-          />
-          <BentoImageCell
-            src="https://images.unsplash.com/photo-1541643600914-78b084683601?w=600&h=400&fit=crop"
-            alt="Parfums"
-            title="Parfums"
-            href="/collections/parfums"
-          />
-        </BentoContainer>
-      </section>
-
-      {/* Newsletter */}
-      <section className="py-10 bg-secondary-navy text-neutral-100">
-        <div className="max-w-xl mx-auto px-6 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-          >
-            <h2 className="font-display text-3xl md:text-4xl font-light mb-4">
-              {t('home.newsletter.title')}
-            </h2>
-            <p className="text-neutral-400 mb-8">
-              {t('home.newsletter.description')}
-            </p>
-            <form className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="email"
-                placeholder={t('home.newsletter.placeholder')}
-                className="flex-1 px-5 py-4 bg-white/10 border border-white/20 rounded-md text-neutral-100 placeholder:text-neutral-500 focus:outline-none focus:border-accent-gold"
-              />
-              <Button variant="gold" size="lg">
-                {t('common.cta.subscribe')}
-              </Button>
-            </form>
-          </motion.div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/40 to-transparent" />
+        <div className="relative h-full max-w-[1200px] mx-auto px-4 md:px-8 flex items-center">
+          <div>
+            <p className="text-xs text-white/80 tracking-[0.2em] uppercase mb-2">Nouveautés</p>
+            <h1 className="font-serif text-2xl md:text-3xl text-white font-light leading-tight mb-3">
+              La beauté sublimée
+            </h1>
+            <Link
+              href="/collections"
+              className="inline-flex items-center px-5 py-2 bg-white text-[#1A1A1A] text-xs font-medium tracking-wider uppercase rounded-full hover:bg-[#B76E79] hover:text-white transition-all"
+            >
+              Découvrir
+            </Link>
+          </div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-12 border-t border-neutral-200">
-        <div className="max-w-[1440px] mx-auto px-6">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <Link href="/" className="font-display text-xl">
-              {t('common.brand.name')}
+      {/* Categories — 3 cards like Clinique */}
+      <section className="max-w-[1200px] mx-auto px-4 md:px-8 py-8">
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { name: 'Soins', href: '/collections/soins', img: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&h=300&fit=crop', desc: 'Sérums, crèmes & rituels' },
+            { name: 'Maquillage', href: '/collections/maquillage', img: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&h=300&fit=crop', desc: 'Visage, yeux & lèvres' },
+            { name: 'Parfums', href: '/collections/parfums', img: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&h=300&fit=crop', desc: 'Eaux de parfum & brumes' },
+          ].map(cat => (
+            <Link key={cat.name} href={cat.href} className="group relative aspect-[4/3] rounded-lg overflow-hidden">
+              <img src={cat.img} alt={cat.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <h3 className="font-serif text-lg text-white">{cat.name}</h3>
+                <p className="text-xs text-white/70">{cat.desc}</p>
+              </div>
             </Link>
-            <p className="text-sm text-neutral-500">
-              © 2024 {t('common.brand.name')}. {t('common.footer.rights')}.
-            </p>
+          ))}
+        </div>
+      </section>
+
+      {/* Soins Section */}
+      {soinsProducts.length > 0 && (
+        <section className="max-w-[1200px] mx-auto px-4 md:px-8 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-serif text-xl text-[#1A1A1A]">Soins</h2>
+            <Link href="/collections/soins" className="text-xs text-[#B76E79] hover:underline tracking-wide uppercase">
+              Tout voir →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {soinsProducts.map(p => (
+              <Link key={p.id} href={`/products/${p.slug}`} className="group">
+                <div className="aspect-square bg-neutral-50 rounded-lg overflow-hidden mb-2">
+                  <img src={p.image} alt={p.name} className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" />
+                </div>
+                <p className="text-xs text-[#B76E79] tracking-wide">{p.brand}</p>
+                <h3 className="text-sm text-[#1A1A1A] leading-tight line-clamp-2">{p.name}</h3>
+                <p className="text-sm font-light text-[#1A1A1A] mt-1">{p.price.toFixed(2)} €</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Maquillage Section */}
+      {maquillageProducts.length > 0 && (
+        <section className="max-w-[1200px] mx-auto px-4 md:px-8 py-6 bg-[#FAFAF8]">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-serif text-xl text-[#1A1A1A]">Maquillage</h2>
+            <Link href="/collections/maquillage" className="text-xs text-[#B76E79] hover:underline tracking-wide uppercase">
+              Tout voir →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {maquillageProducts.map(p => (
+              <Link key={p.id} href={`/products/${p.slug}`} className="group">
+                <div className="aspect-square bg-white rounded-lg overflow-hidden mb-2">
+                  <img src={p.image} alt={p.name} className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" />
+                </div>
+                <p className="text-xs text-[#B76E79] tracking-wide">{p.brand}</p>
+                <h3 className="text-sm text-[#1A1A1A] leading-tight line-clamp-2">{p.name}</h3>
+                <p className="text-sm font-light text-[#1A1A1A] mt-1">{p.price.toFixed(2)} €</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Parfums Section */}
+      {parfumsProducts.length > 0 && (
+        <section className="max-w-[1200px] mx-auto px-4 md:px-8 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-serif text-xl text-[#1A1A1A]">Parfums</h2>
+            <Link href="/collections/parfums" className="text-xs text-[#B76E79] hover:underline tracking-wide uppercase">
+              Tout voir →
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {parfumsProducts.map(p => (
+              <Link key={p.id} href={`/products/${p.slug}`} className="group">
+                <div className="aspect-square bg-neutral-50 rounded-lg overflow-hidden mb-2">
+                  <img src={p.image} alt={p.name} className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105" />
+                </div>
+                <p className="text-xs text-[#B76E79] tracking-wide">{p.brand}</p>
+                <h3 className="text-sm text-[#1A1A1A] leading-tight line-clamp-2">{p.name}</h3>
+                <p className="text-sm font-light text-[#1A1A1A] mt-1">{p.price.toFixed(2)} €</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Footer */}
+      <footer className="py-8 border-t border-neutral-200 mt-8">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <Link href="/" className="font-serif text-lg">Hayoss</Link>
+            <p className="text-xs text-neutral-400">© 2024 Hayoss. Tous droits réservés.</p>
           </div>
         </div>
       </footer>
