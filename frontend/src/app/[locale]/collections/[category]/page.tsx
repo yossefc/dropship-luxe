@@ -222,13 +222,13 @@ export default function CategoryCollectionPage() {
       <div className="min-h-screen bg-[#FFFBF7] flex items-center justify-center">
         <div className="text-center px-6">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#F5EDE8] flex items-center justify-center">
-            <Sparkles className="w-10 h-10 text-[#B8927A]" />
+            <Sparkles className="w-10 h-10 text-[#B76E79]" />
           </div>
           <h1 className="font-serif text-4xl text-[#2D2926] mb-4">Collection introuvable</h1>
           <p className="text-[#6B5B54] mb-8">Cette categorie n&apos;existe pas ou a ete deplacee.</p>
           <Link
             href="/collections"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#B8927A] text-white rounded-lg hover:bg-[#A37E68] transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#B76E79] text-white rounded-lg hover:bg-[#A37E68] transition-colors"
           >
             Voir toutes les collections
             <ChevronRight className="w-4 h-4" />
@@ -272,7 +272,7 @@ export default function CategoryCollectionPage() {
               className="text-center py-20"
             >
               <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#F5EDE8] flex items-center justify-center">
-                <Sparkles className="w-10 h-10 text-[#B8927A]" />
+                <Sparkles className="w-10 h-10 text-[#B76E79]" />
               </div>
               <h3 className="font-serif text-2xl text-[#2D2926] mb-3">
                 {locale === 'fr' ? 'Aucun produit trouve' : 'No products found'}
@@ -289,7 +289,7 @@ export default function CategoryCollectionPage() {
                   setPriceRange([0, 500]);
                   setSortBy('featured');
                 }}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-[#B8927A] text-white rounded-lg hover:bg-[#A37E68] transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[#B76E79] text-white rounded-lg hover:bg-[#A37E68] transition-colors"
               >
                 {locale === 'fr' ? 'Reinitialiser les filtres' : 'Reset filters'}
               </button>
@@ -318,28 +318,24 @@ export default function CategoryCollectionPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {fullCatalog
-              .filter(cat => cat.id !== category.id)
-              .slice(0, 4)
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {[
+              { slug: 'soins', name: 'Soins' },
+              { slug: 'maquillage', name: 'Maquillage' },
+              { slug: 'parfums', name: 'Parfums' },
+            ]
+              .filter(cat => cat.slug !== categorySlug)
               .map((cat) => (
                 <Link
-                  key={cat.id}
-                  href={`/collections/${cat.id}`}
-                  className="group relative aspect-[4/5] rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-xl transition-all duration-500"
+                  key={cat.slug}
+                  href={`/collections/${cat.slug}`}
+                  className="group relative aspect-[3/2] rounded-lg overflow-hidden bg-[#F5F4F2] hover:shadow-md transition-all"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#2D2926]/70 via-[#2D2926]/20 to-transparent z-10" />
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#F9F7F5] to-[#EDE4DC] flex items-center justify-center">
-                    <Sparkles className="w-12 h-12 text-[#B8927A]/30" />
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 p-5 z-20">
-                    <h3 className="font-serif text-xl md:text-2xl text-white mb-1 group-hover:translate-y-[-4px] transition-transform duration-300">
-                      {locale === 'fr' ? cat.nameFR : cat.nameEN}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A]/50 to-transparent z-10" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
+                    <h3 className="font-serif text-lg text-white group-hover:translate-y-[-2px] transition-transform">
+                      {cat.name}
                     </h3>
-                    <span className="text-white/70 text-sm flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      {locale === 'fr' ? 'Decouvrir' : 'Discover'}
-                      <ChevronRight className="w-4 h-4" />
-                    </span>
                   </div>
                 </Link>
               ))}
@@ -352,7 +348,7 @@ export default function CategoryCollectionPage() {
         <div className="max-w-[1200px] mx-auto px-4 md:px-8">
           <div className="flex items-center justify-center gap-4">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#D4C4B5] to-transparent" />
-            <div className="w-2 h-2 rounded-full bg-[#B8927A]" />
+            <div className="w-2 h-2 rounded-full bg-[#B76E79]" />
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#D4C4B5] to-transparent" />
           </div>
         </div>
