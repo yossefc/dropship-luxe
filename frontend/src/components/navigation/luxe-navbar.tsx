@@ -1,214 +1,165 @@
 'use client';
 
 // ============================================================================
-// LUXE NAVBAR - Main Navigation Component
-// ============================================================================
-// Design: Clean, solid background, professional layout
+// LUXE NAVBAR — Clinique-style: logo top, categories below, mega-menu dropdown
 // ============================================================================
 
 import { useState } from 'react';
-import { ShoppingBag, Menu, Search, Heart, User, ChevronDown } from 'lucide-react';
+import { Search, ShoppingBag, User, Heart, Menu, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { Link } from '@/i18n/routing';
-import { cn } from '@/lib/utils';
 import { useCartStore } from '@/lib/store/cart-store';
+import { navigationCategories, type NavCategory } from './navigation-data';
 import { LanguageSwitcher } from '@/components/layout/language-switcher';
 import { MobileDrawer } from './mobile-drawer';
-import { navigationCategories } from './navigation-data';
-
-// ============================================================================
-// DROPDOWN MENU COMPONENT
-// ============================================================================
-
-interface DropdownMenuProps {
-  category: typeof navigationCategories[0];
-  isOpen: boolean;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
-}
-
-function DropdownMenu({ category, isOpen, onMouseEnter, onMouseLeave }: DropdownMenuProps) {
-  const hasSubcategories = category.subcategories && category.subcategories.length > 0;
-
-  return (
-    <div
-      className="relative"
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-    >
-      {hasSubcategories ? (
-        <button
-          className={cn(
-            'flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors',
-            isOpen
-              ? 'text-[#B76E79]'
-              : 'text-[#1A1A1A] hover:text-[#B76E79]'
-          )}
-        >
-          {category.name}
-          <ChevronDown
-            className={cn(
-              'w-4 h-4 transition-transform duration-200',
-              isOpen && 'rotate-180'
-            )}
-          />
-        </button>
-      ) : (
-        <Link
-          href={category.href}
-          className="px-3 py-2 text-sm font-medium text-[#1A1A1A] hover:text-[#B76E79] transition-colors"
-        >
-          {category.name}
-        </Link>
-      )}
-
-      {/* Dropdown Panel */}
-      {hasSubcategories && isOpen && (
-        <div className="absolute top-full left-0 pt-2 z-50">
-          <div className="bg-white rounded-lg shadow-lg border border-gray-100 py-2 min-w-[220px]">
-            {/* View All Link */}
-            <Link
-              href={category.href}
-              className="block px-4 py-2.5 text-sm font-medium text-[#B76E79] hover:bg-[#FDF8F5] border-b border-gray-100 mb-1"
-            >
-              Voir tout {category.name}
-            </Link>
-
-            {/* Subcategories */}
-            {category.subcategories?.map((sub) => (
-              <Link
-                key={sub.href}
-                href={sub.href}
-                className="block px-4 py-2.5 text-sm text-[#1A1A1A] hover:bg-[#FDF8F5] hover:text-[#B76E79] transition-colors"
-              >
-                {sub.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// LUXE NAVBAR COMPONENT
-// ============================================================================
+import { cn } from '@/lib/utils';
 
 export function LuxeNavbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const { openCart, items } = useCartStore();
   const t = useTranslations();
-
-  // Calculate total items in cart
   const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Dropdown handlers
-  const handleMouseEnter = (categoryId: string) => {
-    setActiveDropdown(categoryId);
+  let hoverTimeout: NodeJS.Timeout | null = null;
+
+  const handleMouseEnter = (id: string) => {
+    if (hoverTimeout) clearTimeout(hoverTimeout);
+    setActiveDropdown(id);
   };
 
   const handleMouseLeave = () => {
-    setActiveDropdown(null);
+    hoverTimeout = setTimeout(() => setActiveDropdown(null), 150);
   };
 
   return (
     <>
-      {/* Navbar */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm">
-        {/* Announcement Bar */}
-        <div className="bg-[#1A1A1A] text-white py-2 text-center">
-          <p className="text-xs font-medium tracking-wide">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-white">
+        {/* Row 1: Announcement bar */}
+        <div className="bg-[#1A1A1A] text-white py-1.5 text-center">
+          <p className="text-[10px] tracking-wide">
             Livraison offerte dès 50€ d&apos;achat • Retours gratuits sous 30 jours
           </p>
         </div>
 
-        {/* Main Navbar */}
-        <div className="border-b border-gray-100">
-          <div className="h-16 max-w-7xl mx-auto px-4 lg:px-8 flex items-center justify-between">
-            {/* Left - Mobile Menu + Logo */}
-            <div className="flex items-center gap-4">
-              {/* Mobile Menu Button */}
+        {/* Row 2: Logo + icons */}
+        <div className="border-b border-neutral-100">
+          <div className="max-w-[1200px] mx-auto px-4 h-12 flex items-center justify-between">
+            {/* Left: mobile menu */}
+            <div className="flex items-center gap-3 w-[120px]">
               <button
                 onClick={() => setIsMobileMenuOpen(true)}
-                className="lg:hidden w-10 h-10 flex items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
-                aria-label="Ouvrir le menu"
+                className="lg:hidden w-8 h-8 flex items-center justify-center"
+                aria-label="Menu"
               >
-                <Menu className="w-5 h-5 text-[#1A1A1A]" />
+                <Menu className="w-4 h-4 text-[#1A1A1A]" />
               </button>
-
-              {/* Logo */}
-              <Link
-                href="/"
-                className="font-serif text-2xl font-semibold text-[#1A1A1A] hover:text-[#B76E79] transition-colors"
-              >
-                Hayoss
-              </Link>
+              <button className="hidden sm:flex w-8 h-8 items-center justify-center" aria-label="Rechercher">
+                <Search className="w-4 h-4 text-[#1A1A1A]" />
+              </button>
             </div>
 
-            {/* Center - Desktop Navigation */}
-            <nav className="hidden lg:flex items-center gap-1">
-              {navigationCategories.map((category) => (
-                <DropdownMenu
-                  key={category.id}
-                  category={category}
-                  isOpen={activeDropdown === category.id}
-                  onMouseEnter={() => handleMouseEnter(category.id)}
-                  onMouseLeave={handleMouseLeave}
-                />
-              ))}
-            </nav>
+            {/* Center: Logo */}
+            <Link href="/" className="font-serif text-xl tracking-wide text-[#1A1A1A]">
+              Hayoss
+            </Link>
 
-            {/* Right - Actions */}
-            <div className="flex items-center gap-1">
-              {/* Search */}
-              <button
-                className="hidden sm:flex w-10 h-10 items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
-                aria-label="Rechercher"
-              >
-                <Search className="w-5 h-5 text-[#1A1A1A]" />
-              </button>
-
-              {/* Wishlist */}
-              <Link
-                href="/wishlist"
-                className="hidden sm:flex w-10 h-10 items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
-                aria-label="Ma wishlist"
-              >
-                <Heart className="w-5 h-5 text-[#1A1A1A]" />
+            {/* Right: icons */}
+            <div className="flex items-center gap-1 w-[120px] justify-end">
+              <Link href="/account" className="hidden md:flex w-8 h-8 items-center justify-center" aria-label="Compte">
+                <User className="w-4 h-4 text-[#1A1A1A]" />
               </Link>
-
-              {/* Account */}
-              <Link
-                href="/account"
-                className="hidden md:flex w-10 h-10 items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
-                aria-label="Mon compte"
-              >
-                <User className="w-5 h-5 text-[#1A1A1A]" />
+              <Link href="/wishlist" className="hidden sm:flex w-8 h-8 items-center justify-center" aria-label="Favoris">
+                <Heart className="w-4 h-4 text-[#1A1A1A]" />
               </Link>
-
-              {/* Language Switcher */}
-              <div className="hidden md:block">
-                <LanguageSwitcher />
-              </div>
-
-              {/* Cart Button */}
               <button
                 onClick={openCart}
-                className="relative w-10 h-10 flex items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
-                aria-label={t('common.accessibility.openCart')}
+                className="relative w-8 h-8 flex items-center justify-center"
+                aria-label="Panier"
               >
-                <ShoppingBag className="w-5 h-5 text-[#1A1A1A]" />
+                <ShoppingBag className="w-4 h-4 text-[#1A1A1A]" />
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-[#B76E79] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                    {cartItemCount > 9 ? '9+' : cartItemCount}
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#1A1A1A] text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                    {cartItemCount}
                   </span>
                 )}
               </button>
             </div>
           </div>
         </div>
+
+        {/* Row 3: Category navigation (desktop only) */}
+        <nav className="hidden lg:block border-b border-neutral-100 bg-white">
+          <div className="max-w-[1200px] mx-auto px-4 flex items-center justify-center gap-0">
+            {navigationCategories.map((cat) => {
+              const hasSub = cat.subcategories && cat.subcategories.length > 0;
+              return (
+                <div
+                  key={cat.id}
+                  className="relative"
+                  onMouseEnter={() => hasSub && handleMouseEnter(cat.id)}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  {hasSub ? (
+                    <button
+                      className={cn(
+                        'px-4 py-2.5 text-[11px] font-medium tracking-[0.1em] uppercase transition-colors',
+                        activeDropdown === cat.id
+                          ? 'text-[#1A1A1A] border-b-2 border-[#1A1A1A]'
+                          : 'text-neutral-600 hover:text-[#1A1A1A] border-b-2 border-transparent'
+                      )}
+                    >
+                      {cat.name}
+                    </button>
+                  ) : (
+                    <Link
+                      href={cat.href}
+                      className="px-4 py-2.5 text-[11px] font-medium tracking-[0.1em] uppercase text-neutral-600 hover:text-[#1A1A1A] border-b-2 border-transparent hover:border-[#1A1A1A] transition-colors block"
+                    >
+                      {cat.name}
+                    </Link>
+                  )}
+
+                  {/* Mega Menu Dropdown — full width */}
+                  {hasSub && activeDropdown === cat.id && (
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 top-full pt-0 z-50"
+                      style={{ width: '600px' }}
+                      onMouseEnter={() => handleMouseEnter(cat.id)}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      <div className="bg-white border border-neutral-100 shadow-lg">
+                        {/* Header */}
+                        <div className="px-6 py-3 border-b border-neutral-100">
+                          <Link
+                            href={cat.href}
+                            className="text-xs font-medium tracking-[0.1em] uppercase text-[#1A1A1A] hover:underline"
+                          >
+                            Voir tout {cat.name}
+                          </Link>
+                        </div>
+
+                        {/* Subcategories in 2 columns */}
+                        <div className="px-6 py-4 grid grid-cols-2 gap-x-8 gap-y-0">
+                          {cat.subcategories?.map((sub) => (
+                            <Link
+                              key={sub.href}
+                              href={sub.href}
+                              className="block py-1.5 text-[12px] text-neutral-600 hover:text-[#1A1A1A] hover:underline transition-colors"
+                            >
+                              {sub.name}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </nav>
       </header>
 
       {/* Mobile Drawer */}
@@ -216,9 +167,6 @@ export function LuxeNavbar() {
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}
       />
-
-      {/* Spacer for fixed navbar */}
-      <div className="h-[88px]" /> {/* 64px navbar + 24px announcement bar */}
     </>
   );
 }

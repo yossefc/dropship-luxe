@@ -91,7 +91,7 @@ export default async function LocaleLayout({
     <NextIntlClientProvider messages={messages}>
       <CartProvider>
         <LuxeNavbar />
-        <div className="pt-[88px]">
+        <div className="pt-[104px] lg:pt-[128px]">
           {children}
         </div>
       </CartProvider>
