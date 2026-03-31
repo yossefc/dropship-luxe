@@ -139,7 +139,7 @@ export default function HomePage(): JSX.Element {
 
       {/* Featured Products with Tabs */}
       {loading ? (
-        <section className="py-20">
+        <section className="py-10">
           <div className="flex justify-center">
             <Loader2 className="w-8 h-8 animate-spin text-accent-gold" />
           </div>
@@ -153,7 +153,7 @@ export default function HomePage(): JSX.Element {
       )}
 
       {/* Categories Bento */}
-      <section className="py-section bg-neutral-100">
+      <section className="py-10 bg-neutral-100">
         <BentoContainer layout="featured">
           <BentoImageCell
             src="https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&h=1200&fit=crop"
@@ -185,7 +185,7 @@ export default function HomePage(): JSX.Element {
       </section>
 
       {/* Newsletter */}
-      <section className="py-section bg-secondary-navy text-neutral-100">
+      <section className="py-10 bg-secondary-navy text-neutral-100">
         <div className="max-w-xl mx-auto px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

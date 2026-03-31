@@ -216,75 +216,161 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
         </div>
       </motion.header>
 
-      {/* Main Content */}
+      {/* Main Content — Everything visible without scrolling */}
       <main className="pt-16">
-        <div className="max-w-[1440px] mx-auto">
-          {/* Top Section: Gallery + Info side by side */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
-            {/* Left: Gallery (NOT sticky, natural height) */}
-            <div className="lg:max-h-[85vh] lg:overflow-hidden">
-              <ProductGallery images={galleryImages} productName={product.translation.name} />
-            </div>
+        <div className="max-w-[1200px] mx-auto px-4 py-4">
+          {/* Product Section: Image + Info + Details — all in one view */}
+          <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr_1fr] gap-6">
 
-            {/* Right: Product Info + Variantes + Add to Cart */}
-            <div className="lg:py-6 lg:max-h-[85vh] lg:overflow-y-auto">
-              <ProductInfo product={productInfoData} onAddToCart={handleAddToCart} />
-            </div>
-          </div>
-
-          {/* Bottom Section: Description + Details (full width, below fold) */}
-          <div className="border-t border-neutral-200">
-            <div className="max-w-4xl mx-auto px-6 py-10">
-              {/* Description + Benefits */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                {/* Left: Description */}
-                <div>
-                  <h3 className="font-serif text-xl mb-4">Description</h3>
-                  {product.translation.descriptionHtml ? (
-                    <div
-                      className="prose prose-sm max-w-none text-neutral-600"
-                      dangerouslySetInnerHTML={{ __html: product.translation.descriptionHtml }}
-                    />
-                  ) : (
-                    <p className="text-neutral-600">{product.translation.description}</p>
-                  )}
-                </div>
-
-                {/* Right: Benefits + Ingredients + How To */}
-                <div className="space-y-6">
-                  {product.translation.benefits && product.translation.benefits.length > 0 && (
-                    <div>
-                      <h3 className="font-serif text-xl mb-3">Bienfaits</h3>
-                      <ul className="space-y-2">
-                        {product.translation.benefits.map((b, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-neutral-600">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#B76E79] mt-1.5 flex-shrink-0" />
-                            {b}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {product.translation.ingredients && (
-                    <div>
-                      <h3 className="font-serif text-xl mb-3">Composition</h3>
-                      <p className="text-xs text-neutral-500 bg-neutral-50 p-4 rounded-lg font-mono leading-relaxed">
-                        {product.translation.ingredients}
-                      </p>
-                    </div>
-                  )}
-
-                  {product.translation.howToUse && (
-                    <div>
-                      <h3 className="font-serif text-xl mb-3">Mode d&apos;emploi</h3>
-                      <p className="text-sm text-neutral-600 whitespace-pre-line">
-                        {product.translation.howToUse}
-                      </p>
-                    </div>
-                  )}
-                </div>
+            {/* Col 1: Product Image — small, clean */}
+            <div className="flex flex-col gap-3">
+              <div className="aspect-square bg-neutral-50 rounded-lg overflow-hidden">
+                {product.images[0] && (
+                  <img
+                    src={product.images[0]}
+                    alt={product.translation.name}
+                    className="w-full h-full object-contain"
+                  />
+                )}
               </div>
+              {/* Thumbnails */}
+              {product.images.length > 1 && (
+                <div className="flex gap-2">
+                  {product.images.slice(0, 4).map((img, i) => (
+                    <div key={i} className="w-16 h-16 bg-neutral-50 rounded overflow-hidden border border-neutral-200">
+                      <img src={img} alt="" className="w-full h-full object-contain" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Col 2: Product Info — name, price, variants, add to cart */}
+            <div className="flex flex-col gap-4">
+              {/* Category breadcrumb */}
+              <p className="text-xs text-neutral-400 tracking-wide uppercase">{product.category}</p>
+
+              {/* Brand */}
+              <p className="text-xs font-medium text-[#B76E79] tracking-wider uppercase">{product.brand}</p>
+
+              {/* Name */}
+              <h1 className="font-serif text-xl font-light text-[#1A1A1A] leading-tight">
+                {product.translation.name}
+              </h1>
+
+              {/* Rating */}
+              <div className="flex items-center gap-2">
+                <div className="flex">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className={`text-xs ${i < Math.round(product.rating) ? 'text-amber-400' : 'text-neutral-200'}`}>★</span>
+                  ))}
+                </div>
+                <span className="text-xs text-neutral-400">({product.reviewCount})</span>
+              </div>
+
+              {/* Price */}
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-light text-[#1A1A1A]">
+                  {product.price.toFixed(2)} €
+                </span>
+                {product.originalPrice && product.originalPrice > product.price && (
+                  <span className="text-sm text-neutral-400 line-through">
+                    {product.originalPrice.toFixed(2)} €
+                  </span>
+                )}
+              </div>
+
+              {/* Variants / Sizes */}
+              {product.sizes && product.sizes.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-neutral-500 mb-2 uppercase tracking-wide">Options</p>
+                  <div className="flex flex-wrap gap-2">
+                    {product.sizes.map((size) => (
+                      <button
+                        key={size.id}
+                        className={cn(
+                          'px-3 py-1.5 text-xs rounded border transition-colors',
+                          size.available
+                            ? 'border-neutral-300 hover:border-[#B76E79] text-neutral-700'
+                            : 'border-neutral-100 text-neutral-300 cursor-not-allowed'
+                        )}
+                        disabled={!size.available}
+                      >
+                        {size.label}
+                        {size.price && <span className="ml-1 text-neutral-400">({size.price.toFixed(2)} €)</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Subtitle / Short description */}
+              <p className="text-sm text-neutral-500 leading-relaxed">
+                {product.translation.description.split('.').slice(0, 2).join('.') + '.'}
+              </p>
+
+              {/* Add to Cart */}
+              <button
+                onClick={() => handleAddToCart({ quantity: 1 })}
+                className="w-full py-3 bg-[#1A1A1A] text-white text-sm font-medium tracking-wide rounded hover:bg-[#333] transition-colors flex items-center justify-center gap-2"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                Ajouter au panier
+              </button>
+
+              {/* Stock info */}
+              {product.stock > 0 && (
+                <p className="text-xs text-green-600">✓ En stock ({product.stock} disponibles)</p>
+              )}
+            </div>
+
+            {/* Col 3: Details — description, benefits, ingredients, how to use */}
+            <div className="flex flex-col gap-4 text-sm">
+              {/* Benefits */}
+              {product.translation.benefits && product.translation.benefits.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[#B76E79] mb-2">Bienfaits</h3>
+                  <ul className="space-y-1.5">
+                    {product.translation.benefits.map((b, i) => (
+                      <li key={i} className="flex items-start gap-2 text-neutral-600">
+                        <span className="w-1 h-1 rounded-full bg-[#B76E79] mt-1.5 flex-shrink-0" />
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Description long */}
+              {product.translation.descriptionHtml && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Description</h3>
+                  <div
+                    className="text-neutral-600 leading-relaxed prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ __html: product.translation.descriptionHtml }}
+                  />
+                </div>
+              )}
+
+              {/* Ingredients */}
+              {product.translation.ingredients && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Composition</h3>
+                  <p className="text-xs text-neutral-500 font-mono bg-neutral-50 p-3 rounded leading-relaxed">
+                    {product.translation.ingredients}
+                  </p>
+                </div>
+              )}
+
+              {/* How to use */}
+              {product.translation.howToUse && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Utilisation</h3>
+                  <p className="text-neutral-600 whitespace-pre-line leading-relaxed">
+                    {product.translation.howToUse}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>

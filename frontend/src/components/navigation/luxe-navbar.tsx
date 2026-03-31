@@ -41,8 +41,8 @@ function DropdownMenu({ category, isOpen, onMouseEnter, onMouseLeave }: Dropdown
           className={cn(
             'flex items-center gap-1 px-3 py-2 text-sm font-medium transition-colors',
             isOpen
-              ? 'text-[#B8927A]'
-              : 'text-[#2D2926] hover:text-[#B8927A]'
+              ? 'text-[#B76E79]'
+              : 'text-[#1A1A1A] hover:text-[#B76E79]'
           )}
         >
           {category.name}
@@ -56,7 +56,7 @@ function DropdownMenu({ category, isOpen, onMouseEnter, onMouseLeave }: Dropdown
       ) : (
         <Link
           href={category.href}
-          className="px-3 py-2 text-sm font-medium text-[#2D2926] hover:text-[#B8927A] transition-colors"
+          className="px-3 py-2 text-sm font-medium text-[#1A1A1A] hover:text-[#B76E79] transition-colors"
         >
           {category.name}
         </Link>
@@ -69,7 +69,7 @@ function DropdownMenu({ category, isOpen, onMouseEnter, onMouseLeave }: Dropdown
             {/* View All Link */}
             <Link
               href={category.href}
-              className="block px-4 py-2.5 text-sm font-medium text-[#B8927A] hover:bg-[#FDF8F5] border-b border-gray-100 mb-1"
+              className="block px-4 py-2.5 text-sm font-medium text-[#B76E79] hover:bg-[#FDF8F5] border-b border-gray-100 mb-1"
             >
               Voir tout {category.name}
             </Link>
@@ -79,7 +79,7 @@ function DropdownMenu({ category, isOpen, onMouseEnter, onMouseLeave }: Dropdown
               <Link
                 key={sub.href}
                 href={sub.href}
-                className="block px-4 py-2.5 text-sm text-[#2D2926] hover:bg-[#FDF8F5] hover:text-[#B8927A] transition-colors"
+                className="block px-4 py-2.5 text-sm text-[#1A1A1A] hover:bg-[#FDF8F5] hover:text-[#B76E79] transition-colors"
               >
                 {sub.name}
               </Link>
@@ -118,7 +118,7 @@ export function LuxeNavbar() {
       {/* Navbar */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-white shadow-sm">
         {/* Announcement Bar */}
-        <div className="bg-[#2D2926] text-white py-2 text-center">
+        <div className="bg-[#1A1A1A] text-white py-2 text-center">
           <p className="text-xs font-medium tracking-wide">
             Livraison offerte dès 50€ d&apos;achat • Retours gratuits sous 30 jours
           </p>
@@ -135,13 +135,13 @@ export function LuxeNavbar() {
                 className="lg:hidden w-10 h-10 flex items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
                 aria-label="Ouvrir le menu"
               >
-                <Menu className="w-5 h-5 text-[#2D2926]" />
+                <Menu className="w-5 h-5 text-[#1A1A1A]" />
               </button>
 
               {/* Logo */}
               <Link
                 href="/"
-                className="font-serif text-2xl font-semibold text-[#2D2926] hover:text-[#B8927A] transition-colors"
+                className="font-serif text-2xl font-semibold text-[#1A1A1A] hover:text-[#B76E79] transition-colors"
               >
                 Hayoss
               </Link>
@@ -167,7 +167,7 @@ export function LuxeNavbar() {
                 className="hidden sm:flex w-10 h-10 items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
                 aria-label="Rechercher"
               >
-                <Search className="w-5 h-5 text-[#2D2926]" />
+                <Search className="w-5 h-5 text-[#1A1A1A]" />
               </button>
 
               {/* Wishlist */}
@@ -176,7 +176,7 @@ export function LuxeNavbar() {
                 className="hidden sm:flex w-10 h-10 items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
                 aria-label="Ma wishlist"
               >
-                <Heart className="w-5 h-5 text-[#2D2926]" />
+                <Heart className="w-5 h-5 text-[#1A1A1A]" />
               </Link>
 
               {/* Account */}
@@ -185,7 +185,7 @@ export function LuxeNavbar() {
                 className="hidden md:flex w-10 h-10 items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
                 aria-label="Mon compte"
               >
-                <User className="w-5 h-5 text-[#2D2926]" />
+                <User className="w-5 h-5 text-[#1A1A1A]" />
               </Link>
 
               {/* Language Switcher */}
@@ -199,9 +199,9 @@ export function LuxeNavbar() {
                 className="relative w-10 h-10 flex items-center justify-center hover:bg-gray-50 rounded-full transition-colors"
                 aria-label={t('common.accessibility.openCart')}
               >
-                <ShoppingBag className="w-5 h-5 text-[#2D2926]" />
+                <ShoppingBag className="w-5 h-5 text-[#1A1A1A]" />
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-[#B8927A] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-[#B76E79] text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                     {cartItemCount > 9 ? '9+' : cartItemCount}
                   </span>
                 )}

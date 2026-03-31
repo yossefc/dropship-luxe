@@ -161,13 +161,13 @@ export function ProductCard({
         </span>
 
         <Link href={`/${locale}/products/${product.slug}`}>
-          <h3 className="font-heading text-lg font-medium text-primary-800 leading-snug line-clamp-2 hover:text-accent-gold transition-colors">
+          <h3 className="font-heading text-sm font-medium text-primary-800 leading-snug line-clamp-2 hover:text-accent-gold transition-colors">
             {product.name}
           </h3>
         </Link>
 
-        <div className="flex items-baseline gap-2 mt-1">
-          <span className="text-base font-light text-primary-800">
+        <div className="flex items-baseline gap-2 mt-0.5">
+          <span className="text-sm font-light text-primary-800">
             {formatPrice(product.price, product.currency)}
           </span>
           {product.originalPrice != null && (

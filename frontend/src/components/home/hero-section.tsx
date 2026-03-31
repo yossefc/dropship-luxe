@@ -60,7 +60,7 @@ export function HeroSection({
   };
 
   return (
-    <section className="relative h-[50vh] min-h-[400px] max-h-[500px] overflow-hidden">
+    <section className="relative h-[35vh] min-h-[280px] max-h-[380px] overflow-hidden">
       {/* Video Background */}
       <div className="absolute inset-0">
         <video
@@ -115,7 +115,7 @@ export function HeroSection({
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="font-display text-3xl md:text-4xl lg:text-5xl font-light text-white leading-[1.1] mb-4"
+            className="font-serif text-2xl md:text-3xl lg:text-4xl font-light text-white leading-[1.15] mb-3"
           >
             {title}
           </motion.h1>
@@ -128,7 +128,7 @@ export function HeroSection({
           >
             <Link
               href={ctaHref}
-              className="inline-flex items-center justify-center px-8 py-4 bg-white text-primary-800 font-accent font-semibold text-sm tracking-wider uppercase rounded-full hover:bg-accent-gold hover:text-primary-800 transition-all duration-300 shadow-lg hover:shadow-xl"
+              className="inline-flex items-center justify-center px-6 py-2.5 bg-white text-primary-800 font-accent font-medium text-xs tracking-wider uppercase rounded-full hover:bg-accent-gold hover:text-primary-800 transition-all duration-300 shadow-md"
             >
               {ctaText}
             </Link>

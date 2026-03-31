@@ -259,7 +259,7 @@ export default function CategoryCollectionPage() {
       />
 
       {/* Main Content Area */}
-      <main className="max-w-[1440px] mx-auto px-6 md:px-10 lg:px-16 py-12 md:py-16">
+      <main className="max-w-[1200px] mx-auto px-4 md:px-8 py-12 md:py-16">
         <AnimatePresence mode="wait">
           {loading ? (
             <ProductSkeletonGrid key="skeleton" count={8} />
@@ -305,7 +305,7 @@ export default function CategoryCollectionPage() {
 
       {/* Related Collections Section */}
       <section className="bg-[#F5EDE8] py-16 md:py-24">
-        <div className="max-w-[1440px] mx-auto px-6 md:px-10 lg:px-16">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-8">
           <div className="text-center mb-12">
             <h2 className="font-serif text-3xl md:text-4xl text-[#2D2926] mb-4">
               {locale === 'fr' ? 'Explorer d\'autres collections' : 'Explore other collections'}
@@ -349,7 +349,7 @@ export default function CategoryCollectionPage() {
 
       {/* Decorative footer divider */}
       <div className="bg-[#FFFBF7] py-12">
-        <div className="max-w-[1440px] mx-auto px-6 md:px-10 lg:px-16">
+        <div className="max-w-[1200px] mx-auto px-4 md:px-8">
           <div className="flex items-center justify-center gap-4">
             <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#D4C4B5] to-transparent" />
             <div className="w-2 h-2 rounded-full bg-[#B8927A]" />

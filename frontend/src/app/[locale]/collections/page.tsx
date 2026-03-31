@@ -220,7 +220,7 @@ export default function CollectionsPage() {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative h-[35vh] min-h-[280px] bg-[#F5F4F2] flex items-center justify-center overflow-hidden">
+      <section className="relative h-[18vh] min-h-[120px] max-h-[160px] bg-[#F5F4F2] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/20" />
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -231,7 +231,7 @@ export default function CollectionsPage() {
           <span className="text-xs font-medium tracking-[0.3em] uppercase text-[#B76E79] mb-4 block">
             Nos Collections
           </span>
-          <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-[#1A1A1A] font-light">
+          <h1 className="font-serif text-2xl md:text-3xl text-[#1A1A1A] font-light">
             {selectedCategory
               ? mainCategories.find(c => c.slug === selectedCategory)?.name ?? selectedCategory
               : 'Découvrez nos Univers'}
@@ -249,8 +249,8 @@ export default function CollectionsPage() {
 
       {/* CATEGORY CARDS — shown when no category is selected */}
       {!selectedCategory && (
-        <section className="max-w-[1200px] mx-auto px-4 md:px-8 py-16">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <section className="max-w-[1200px] mx-auto px-4 md:px-8 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {mainCategories.map(cat => {
               const card = categoryCards[cat.slug];
               const productCount = products.filter(p => p.categoryId === cat.slug).length;
@@ -264,7 +264,7 @@ export default function CollectionsPage() {
                   className="group relative overflow-hidden rounded-xl bg-[#F5F4F2] text-left"
                 >
                   {/* Image */}
-                  <div className="aspect-[3/4] overflow-hidden">
+                  <div className="aspect-[4/5] overflow-hidden">
                     <img
                       src={card?.image ?? 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&h=800&fit=crop'}
                       alt={cat.name}
@@ -290,7 +290,7 @@ export default function CollectionsPage() {
           </div>
 
           {/* Subcategories quick links */}
-          <div className="mt-16 space-y-10">
+          <div className="mt-8 space-y-6">
             {mainCategories.filter(cat => categories.some(c => c.parentSlug === cat.slug)).map(cat => (
               <div key={cat.slug}>
                 <h3 className="font-serif text-xl text-[#1A1A1A] mb-4">{cat.name}</h3>
