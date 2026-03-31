@@ -219,31 +219,71 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
       {/* Main Content */}
       <main className="pt-16">
         <div className="max-w-[1440px] mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 min-h-screen">
-            {/* Left: Sticky Gallery */}
-            <div className="lg:h-screen lg:sticky lg:top-16">
+          {/* Top Section: Gallery + Info side by side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-0">
+            {/* Left: Gallery (NOT sticky, natural height) */}
+            <div className="lg:max-h-[85vh] lg:overflow-hidden">
               <ProductGallery images={galleryImages} productName={product.translation.name} />
             </div>
 
-            {/* Right: Product Info + Accordions */}
-            <div className="lg:py-8">
-              {/* Product Info */}
+            {/* Right: Product Info + Variantes + Add to Cart */}
+            <div className="lg:py-6 lg:max-h-[85vh] lg:overflow-y-auto">
               <ProductInfo product={productInfoData} onAddToCart={handleAddToCart} />
+            </div>
+          </div>
 
-              {/* Accordions */}
-              <div className="px-6 lg:px-8 lg:pr-16 pb-8">
-                <ProductAccordions
-                  description={product.translation.description}
-                  descriptionHtml={product.translation.descriptionHtml}
-                  benefits={product.translation.benefits}
-                  ingredients={product.translation.ingredients}
-                  howToUse={product.translation.howToUse}
-                />
-              </div>
+          {/* Bottom Section: Description + Details (full width, below fold) */}
+          <div className="border-t border-neutral-200">
+            <div className="max-w-4xl mx-auto px-6 py-10">
+              {/* Description + Benefits */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                {/* Left: Description */}
+                <div>
+                  <h3 className="font-serif text-xl mb-4">Description</h3>
+                  {product.translation.descriptionHtml ? (
+                    <div
+                      className="prose prose-sm max-w-none text-neutral-600"
+                      dangerouslySetInnerHTML={{ __html: product.translation.descriptionHtml }}
+                    />
+                  ) : (
+                    <p className="text-neutral-600">{product.translation.description}</p>
+                  )}
+                </div>
 
-              {/* Allergy Disclaimer */}
-              <div className="px-6 lg:px-8 lg:pr-16 pb-12">
-                <AllergyDisclaimer variant="compact" showPatchTestInfo />
+                {/* Right: Benefits + Ingredients + How To */}
+                <div className="space-y-6">
+                  {product.translation.benefits && product.translation.benefits.length > 0 && (
+                    <div>
+                      <h3 className="font-serif text-xl mb-3">Bienfaits</h3>
+                      <ul className="space-y-2">
+                        {product.translation.benefits.map((b, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-neutral-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#B76E79] mt-1.5 flex-shrink-0" />
+                            {b}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {product.translation.ingredients && (
+                    <div>
+                      <h3 className="font-serif text-xl mb-3">Composition</h3>
+                      <p className="text-xs text-neutral-500 bg-neutral-50 p-4 rounded-lg font-mono leading-relaxed">
+                        {product.translation.ingredients}
+                      </p>
+                    </div>
+                  )}
+
+                  {product.translation.howToUse && (
+                    <div>
+                      <h3 className="font-serif text-xl mb-3">Mode d&apos;emploi</h3>
+                      <p className="text-sm text-neutral-600 whitespace-pre-line">
+                        {product.translation.howToUse}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
