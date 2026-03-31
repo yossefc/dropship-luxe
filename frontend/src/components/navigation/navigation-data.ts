@@ -76,6 +76,17 @@ export const navigationCategories: NavCategory[] = [
     name: 'Parfums',
     href: '/collections/parfums',
   },
+  {
+    id: 'coffrets',
+    name: 'Coffrets',
+    href: '/collections?tag=coffrets',
+  },
+  {
+    id: 'offres',
+    name: 'Offres',
+    href: '/collections?tag=offres',
+    featured: true,
+  },
 ];
 
 // ============================================================================
