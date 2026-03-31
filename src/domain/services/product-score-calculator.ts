@@ -81,8 +81,8 @@ export class ProductScoreCalculator {
   // ============================================================================
   // HARD RULES - Minimum Requirements (Instant Rejection)
   // ============================================================================
-  private readonly MIN_ORDERS_REQUIRED = 50;
-  private readonly MIN_REVIEWS_REQUIRED = 50;
+  private readonly MIN_ORDERS_REQUIRED = 5;
+  private readonly MIN_REVIEWS_REQUIRED = 0; // Affiliates API doesn't always provide review counts
 
   /**
    * Check hard rules - instant rejection if not met

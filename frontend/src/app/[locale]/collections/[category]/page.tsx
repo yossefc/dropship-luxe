@@ -14,7 +14,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLocale } from 'next-intl';
 import Link from 'next/link';
 import { ChevronRight, Sparkles } from 'lucide-react';
-import { fullCatalog, getCategoryBySlug } from '@/config/catalog-structure';
 import {
   CollectionHero,
   CollectionFilters,
@@ -22,6 +21,8 @@ import {
   ProductSkeletonGrid,
   type SortOption,
 } from '@/components/collection';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
 // ============================================================================
 // TYPES
@@ -52,7 +53,7 @@ interface Product {
 // API URL
 // ============================================================================
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+// API_URL is defined above as API_BASE
 
 // ============================================================================
 // HELPER FUNCTIONS (moved before component for TypeScript compatibility)
@@ -90,8 +91,8 @@ export default function CategoryCollectionPage() {
   const locale = useLocale();
   const categorySlug = params.category as string;
 
-  // Get category info from slug
-  const category = useMemo(() => getCategoryBySlug(categorySlug), [categorySlug]);
+  // Category info fetched from API
+  const [category, setCategory] = useState<{ id: string; name: string; slug: string; subCategories: Array<{ id: string; slug: string; name: string }> } | null>(null);
 
   // State
   const [products, setProducts] = useState<Product[]>([]);
@@ -100,54 +101,81 @@ export default function CategoryCollectionPage() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
   const [sortBy, setSortBy] = useState<SortOption>('featured');
 
-  // Fetch products for this category
+  // Fetch products for this category slug
   useEffect(() => {
     async function fetchProducts() {
-      if (!category) return;
-
       setLoading(true);
       try {
-        const res = await fetch(`${API_URL}/products?category=${category.id}`);
+        // Fetch all products and filter by category slug on the client
+        const res = await fetch(`${API_BASE}/products?limit=100`);
         if (!res.ok) throw new Error('Failed to fetch');
 
         const data = await res.json();
         if (data.success && data.data) {
-          const mappedProducts: Product[] = data.data.map((p: any) => ({
+          // Find products matching this category slug (either direct or parent)
+          const categoryProducts = data.data.filter((p: any) => {
+            const catSlug = p.category?.slug;
+            const parentSlug = p.category?.parent?.slug;
+            return catSlug === categorySlug || parentSlug === categorySlug;
+          });
+
+          // Build category info from products
+          const subCats = new Map<string, { id: string; slug: string; name: string }>();
+          for (const p of categoryProducts) {
+            if (p.category?.parent?.slug === categorySlug) {
+              subCats.set(p.category.slug, {
+                id: p.category.id,
+                slug: p.category.slug,
+                name: p.category.name,
+              });
+            }
+          }
+
+          // Category display name
+          const catNames: Record<string, string> = {
+            'soins': 'Soins',
+            'maquillage': 'Maquillage',
+            'parfums': 'Parfums',
+          };
+
+          setCategory({
+            id: categorySlug,
+            name: catNames[categorySlug] ?? categorySlug,
+            slug: categorySlug,
+            subCategories: Array.from(subCats.values()),
+          });
+
+          const mappedProducts: Product[] = categoryProducts.map((p: any) => ({
             id: p.id,
-            slug: p.translations?.[0]?.slug || p.aliexpressId,
-            name: p.translations?.[0]?.name || p.name,
-            brand: 'Dropship Luxe',
+            slug: p.slug || p.aliexpressId,
+            name: p.name,
+            brand: 'Hayoss',
             price: Number(p.sellingPrice),
-            originalPrice: p.importScore >= 80 ? Math.round(Number(p.sellingPrice) * 1.3) : undefined,
+            originalPrice: p.isFeatured ? Math.round(Number(p.sellingPrice) * 1.3) : undefined,
             currency: p.currency || 'EUR',
-            image: p.images?.[0] || '/images/placeholder.jpg',
+            image: p.images?.[0] || '/products/placeholder-luxe.png',
             hoverImage: p.images?.[1],
             images: p.images,
-            categoryId: category.id,
-            subCategoryId: p.subCategoryId || 'general',
-            badge: p.importScore >= 92 ? 'bestseller' : p.importScore >= 85 ? 'new' : undefined,
+            categoryId: p.category?.id ?? '',
+            subCategoryId: p.category?.slug ?? 'general',
+            badge: p.isFeatured ? 'bestseller' : undefined,
             rating: Number(p.rating) || 4.5,
-            reviewCount: Math.floor(Math.random() * 150) + 20,
+            reviewCount: p.orderVolume || 0,
             colorSwatches: generateColorSwatches(p.name),
             importScore: p.importScore,
             createdAt: p.createdAt,
           }));
           setProducts(mappedProducts);
-        } else {
-          // Use fallback products if API returns empty
-          setProducts(getFallbackProducts(category.id));
         }
       } catch (error) {
         console.error('Error fetching products:', error);
-        // Fallback products on error
-        setProducts(getFallbackProducts(category?.id || 'skincare'));
       } finally {
         setLoading(false);
       }
     }
 
     fetchProducts();
-  }, [category]);
+  }, [categorySlug]);
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {

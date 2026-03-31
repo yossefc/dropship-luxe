@@ -17,6 +17,8 @@
     "docker:prod": "docker-compose up -d"
   },
   "dependencies": {
+    "@google/genai": "^1.47.0",
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.10.0",
     "axios": "^1.6.7",
     "bullmq": "^5.4.2",

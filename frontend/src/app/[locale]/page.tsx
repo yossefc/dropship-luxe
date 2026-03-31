@@ -35,6 +35,7 @@ const fallbackProducts: ProductCardData[] = getFeaturedProducts(12).map(p => ({
 interface ApiProduct {
   id: string;
   aliexpressId: string;
+  slug: string;
   name: string;
   supplierName: string;
   sellingPrice: number;
@@ -43,6 +44,13 @@ interface ApiProduct {
   images: string[];
   rating: number;
   importScore: number;
+  isFeatured: boolean;
+  category?: {
+    id: string;
+    name: string;
+    slug: string;
+    parent?: { slug: string };
+  };
   translations?: Array<{
     locale: string;
     name: string;
@@ -64,23 +72,39 @@ export default function HomePage(): JSX.Element {
         const data = await res.json();
 
         if (data.success && data.data?.length > 0) {
-          const mappedProducts: ProductCardData[] = data.data.slice(0, 8).map((p: ApiProduct) => {
-            // Calculer le prix original "barré" (environ 25% de plus que le prix de vente)
+          const mappedProducts: ProductCardData[] = data.data.slice(0, 12).map((p: ApiProduct) => {
             const originalPriceValue = Math.round(p.sellingPrice * 1.25);
+            // Determine category from parent slug or direct slug
+            const parentSlug = p.category?.parent?.slug ?? p.category?.slug ?? 'soins';
+            const categoryMap: Record<string, string> = {
+              'soins': 'soins',
+              'maquillage': 'maquillage',
+              'parfums': 'parfums',
+              // Subcategories map to parent
+              'hydratants-serums': 'soins',
+              'soins-yeux': 'soins',
+              'solaires-autobronzants': 'soins',
+              'demaquillants': 'soins',
+              'masques-visage': 'soins',
+              'mains-corps': 'soins',
+              'maquillage-visage': 'maquillage',
+              'maquillage-yeux': 'maquillage',
+              'maquillage-levres': 'maquillage',
+            };
 
             return {
               id: p.id,
               slug: p.slug || p.aliexpressId,
               name: p.name,
-              brand: p.supplierName || 'Hayoss',
+              brand: 'Hayoss',
               price: p.sellingPrice,
-              // Afficher le prix original barré seulement pour certains produits (top scorers)
-              originalPrice: p.importScore >= 75 ? originalPriceValue : undefined,
+              originalPrice: p.isFeatured ? originalPriceValue : undefined,
               currency: p.currency || 'EUR',
-              image: p.images?.[0] || 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=800&fit=crop',
+              image: p.images?.[0] || '/products/placeholder-luxe.png',
               hoverImage: p.images?.[1],
-              badge: p.importScore >= 90 ? 'bestseller' : p.importScore >= 80 ? 'new' : undefined,
+              badge: p.isFeatured ? 'bestseller' : undefined,
               rating: p.rating || 4.5,
+              category: (categoryMap[p.category?.slug ?? ''] ?? 'soins') as 'soins' | 'maquillage' | 'parfums',
             };
           });
           setProducts(mappedProducts);
@@ -124,10 +148,7 @@ export default function HomePage(): JSX.Element {
         <FeaturedProductsTabs
           title={t('home.featured.title')}
           subtitle={t('home.featured.overline')}
-          products={products.map((p, i) => ({
-            ...p,
-            category: i % 2 === 0 ? 'skincare' : 'makeup',
-          }))}
+          products={products}
         />
       )}
 
@@ -135,18 +156,18 @@ export default function HomePage(): JSX.Element {
       <section className="py-section bg-neutral-100">
         <BentoContainer layout="featured">
           <BentoImageCell
-            src="https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=800&h=1200&fit=crop"
-            alt={t('home.categories.skincare.title')}
-            title={t('home.categories.skincare.title')}
-            subtitle={t('home.categories.skincare.subtitle')}
-            href="/collections/skincare"
+            src="https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=800&h=1200&fit=crop"
+            alt="Soins"
+            title="Soins"
+            subtitle="Sérums, crèmes & rituels beauté"
+            href="/collections/soins"
             span="featured"
           />
           <BentoImageCell
-            src="https://images.unsplash.com/photo-1571875257727-256c39da42af?w=600&h=400&fit=crop"
-            alt={t('home.categories.makeup.title')}
-            title={t('home.categories.makeup.title')}
-            href="/collections/makeup"
+            src="https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=600&h=400&fit=crop"
+            alt="Maquillage"
+            title="Maquillage"
+            href="/collections/maquillage"
           />
           <BentoTextCell
             title={t('home.shipping.title')}
@@ -155,10 +176,10 @@ export default function HomePage(): JSX.Element {
             align="center"
           />
           <BentoImageCell
-            src="https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?w=600&h=400&fit=crop"
-            alt={t('home.categories.fragrances.title')}
-            title={t('home.categories.fragrances.title')}
-            href="/collections/body-care"
+            src="https://images.unsplash.com/photo-1541643600914-78b084683601?w=600&h=400&fit=crop"
+            alt="Parfums"
+            title="Parfums"
+            href="/collections/parfums"
           />
         </BentoContainer>
       </section>

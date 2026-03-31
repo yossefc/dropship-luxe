@@ -50,14 +50,30 @@ import {
 const BEAUTY_HEALTH_CATEGORY_ID = '66';
 
 const ALLOWED_COSMETIC_CATEGORY_IDS = [
-  '66',    // Beauty & Health (main)
-  '3001',  // Makeup
-  '3002',  // Skin Care
-  '3003',  // Hair Care
-  '3004',  // Nail Art
-  '3005',  // Beauty Tools
-  '3006',  // Fragrances
-  '100003109', // Health & Beauty (alternative ID)
+  // Main category
+  '66',          // Beauty & Health (main parent)
+
+  // DISCOVERED FROM API (2026-03-29)
+  '3306',        // SKINCARE - Retinol cream, Collagen serum, Neck cream (6 products)
+  '660103',      // MAKEUP - Lip gloss, Eyelash, Brushes (117 products)
+  '200001147',   // NAILS - Gel polish, False nails (76 products)
+  '100000616',   // PERFUME - Spray bottles (8 products)
+  '202236816',   // PERFUME - Eau de Parfum (1 product)
+  '200001168',   // HAIR - Headbands, Hair clips (6 products)
+  '200001355',   // EYES - Contact lenses, Eye masks (5 products)
+  '660302',      // TOOLS - Nose/hair trimmers (3 products)
+  '200001288',   // BODY - Bath products, Soap (2 products)
+  '200001221',   // AROMATHERAPY - Essential oils (2 products)
+  '200001976',   // HAIR - Henna, Hair pearls (2 products)
+  '201217706',   // SLEEP - Sleep masks (1 product)
+
+  // Legacy IDs (may not work)
+  '3001',        // Makeup (legacy)
+  '3002',        // Skin Care (legacy)
+  '3003',        // Hair Care (legacy)
+  '3004',        // Nail Art (legacy)
+  '3005',        // Beauty Tools (legacy)
+  '3006',        // Fragrances (legacy)
 ];
 
 /**
@@ -91,17 +107,22 @@ const COSMETIC_VALIDATION_KEYWORDS = [
  * Keywords that indicate NON-cosmetic products - REJECT these
  */
 const FORBIDDEN_PRODUCT_KEYWORDS = [
-  'phone', 'case', 'cable', 'charger', 'electronic', 'gadget',
-  'toy', 'game', 'tool', 'hardware', 'car', 'auto', 'motor',
+  'phone', 'cable', 'charger', 'electronic', 'gadget',
+  'toy', 'game', 'hardware', 'motor',
   'sport', 'fitness', 'gym', 'outdoor', 'camping',
   'kitchen', 'cooking', 'food', 'drink',
-  'clothing', 'shirt', 'pants', 'dress', 'shoe', 'bag',
-  'jewelry', 'watch', 'ring', 'necklace', 'bracelet', 'earring',
-  'home', 'furniture', 'decor', 'garden',
-  'pet', 'dog', 'cat', 'animal',
-  'baby', 'kid', 'child', 'infant',
-  'office', 'stationery', 'book',
+  'shirt', 'pants', 'dress', 'shoe',
+  'jewelry', 'necklace', 'bracelet', 'earring',
+  'furniture', 'decor', 'garden',
+  'pet', 'dog', 'animal',
+  'infant',
+  'stationery',
 ];
+
+// Word-boundary regex patterns to avoid false positives (e.g. "car" matching "skincare")
+const FORBIDDEN_KEYWORD_PATTERNS = FORBIDDEN_PRODUCT_KEYWORDS.map(
+  kw => new RegExp(`\\b${kw}\\b`, 'i')
+);
 
 /**
  * Validates if a product belongs to the beauty/cosmetics niche
@@ -115,12 +136,12 @@ export function validateCosmeticProduct(
   const titleLower = title.toLowerCase();
   const categoryLower = categoryName.toLowerCase();
 
-  // Check for forbidden keywords first (strict rejection)
-  for (const forbidden of FORBIDDEN_PRODUCT_KEYWORDS) {
-    if (titleLower.includes(forbidden)) {
+  // Check for forbidden keywords first (strict rejection) - word boundary matching
+  for (let i = 0; i < FORBIDDEN_KEYWORD_PATTERNS.length; i++) {
+    if (FORBIDDEN_KEYWORD_PATTERNS[i]!.test(titleLower)) {
       return {
         valid: false,
-        reason: `Produit rejeté: contient le mot-clé interdit "${forbidden}"`,
+        reason: `Produit rejeté: contient le mot-clé interdit "${FORBIDDEN_PRODUCT_KEYWORDS[i]}"`,
       };
     }
   }
@@ -163,6 +184,9 @@ export interface AliExpressDSConfig {
   gatewayUrl?: string;
   /** Tracking ID for affiliate programs (optional) */
   trackingId?: string;
+  /** Separate app credentials for Affiliate API (if different app) */
+  affiliateAppKey?: string;
+  affiliateAppSecret?: string;
 }
 
 /**
@@ -333,8 +357,11 @@ export class AliExpressDSAdapter implements SupplierApi {
    */
   private generateSignature(
     params: Record<string, string>,
-    algorithm: 'md5' | 'sha256' = 'md5'
+    algorithm: 'md5' | 'sha256' = 'md5',
+    secret?: string
   ): string {
+    const signingSecret = secret ?? this.config.appSecret;
+
     // Sort all parameters except 'sign'
     const signParams = Object.entries(params)
       .filter(([key, value]) =>
@@ -355,7 +382,7 @@ export class AliExpressDSAdapter implements SupplierApi {
 
     // Generate HMAC signature
     return crypto
-      .createHmac(algorithm, this.config.appSecret)
+      .createHmac(algorithm, signingSecret)
       .update(baseString, 'utf8')
       .digest('hex')
       .toUpperCase();
@@ -363,13 +390,20 @@ export class AliExpressDSAdapter implements SupplierApi {
 
   /**
    * Build complete request parameters with signature
+   * Uses affiliate app credentials for affiliate.* methods if configured
    */
   private async buildRequestParams(
     method: string,
     bizParams: Record<string, unknown> = {}
   ): Promise<Record<string, string>> {
-    // Get OAuth access token
-    const accessToken = await this.config.getAccessToken();
+    // Use affiliate credentials for affiliate API methods if available
+    const isAffiliateMethod = method.includes('.affiliate.');
+    const appKey = (isAffiliateMethod && this.config.affiliateAppKey)
+      ? this.config.affiliateAppKey
+      : this.config.appKey;
+    const appSecret = (isAffiliateMethod && this.config.affiliateAppSecret)
+      ? this.config.affiliateAppSecret
+      : this.config.appSecret;
 
     // Use HMAC-MD5 which is more widely supported
     const signMethod = 'hmac';
@@ -378,13 +412,25 @@ export class AliExpressDSAdapter implements SupplierApi {
     // Base parameters required for all requests
     const params: Record<string, string> = {
       method,
-      app_key: this.config.appKey,
-      session: accessToken,
+      app_key: appKey,
       timestamp: Date.now().toString(),
       sign_method: signMethod,
       v: '2.0',
       simplify: 'true',
     };
+
+    // Affiliate API methods do NOT need session (OAuth token)
+    // Only DS API methods need the session parameter
+    if (!isAffiliateMethod) {
+      try {
+        const accessToken = await this.config.getAccessToken();
+        if (accessToken && accessToken.length > 0) {
+          params.session = accessToken;
+        }
+      } catch {
+        // No OAuth token available - DS methods will fail, affiliate methods OK
+      }
+    }
 
     // Add business parameters (stringify objects)
     for (const [key, value] of Object.entries(bizParams)) {
@@ -393,8 +439,8 @@ export class AliExpressDSAdapter implements SupplierApi {
       }
     }
 
-    // Generate and add signature
-    params.sign = this.generateSignature(params, algorithm);
+    // Generate and add signature using the matching secret
+    params.sign = this.generateSignature(params, algorithm, appSecret);
 
     return params;
   }
@@ -450,8 +496,26 @@ export class AliExpressDSAdapter implements SupplierApi {
       } | undefined;
 
       if (methodResponse) {
-        // Check for method-level error
-        // Note: rsp_code can be number (200) or string ("200") depending on the API method
+        // Affiliate API wraps response in resp_result
+        const respResult = (methodResponse as Record<string, unknown>).resp_result as {
+          resp_code?: number;
+          resp_msg?: string;
+          result?: T;
+        } | undefined;
+
+        if (respResult) {
+          if (respResult.resp_code !== undefined && respResult.resp_code !== 200) {
+            throw new ExternalServiceError(
+              'AliExpress DS',
+              `${respResult.resp_code}: ${respResult.resp_msg ?? 'Unknown error'}`
+            );
+          }
+          if (respResult.result !== undefined) {
+            return respResult.result;
+          }
+        }
+
+        // DS API format: check rsp_code directly
         const rspCode = methodResponse.rsp_code;
         const isSuccess = rspCode === '200' || String(rspCode) === '200';
 
@@ -1112,7 +1176,8 @@ export class AliExpressDSAdapter implements SupplierApi {
           f.feed_name.toLowerCase().includes('eu') ||
           f.feed_name.toLowerCase().includes('europe')
         );
-        feedName = preferredFeed?.feed_name ?? availableFeeds[0].feed_name;
+        const firstFeed = availableFeeds[0];
+        feedName = preferredFeed?.feed_name ?? firstFeed?.feed_name ?? 'DS_France_topsellers';
         console.log(`[AliExpress DS] Using feed: ${feedName} (from ${availableFeeds.length} available)`);
       }
     } catch (feedError) {
@@ -1143,16 +1208,22 @@ export class AliExpressDSAdapter implements SupplierApi {
       country: 'FR',
       category_id: enforcedCategoryId,
       page_no: params.page ?? 1,
-      page_size: params.pageSize ?? 50,
+      page_size: params.pageSize ?? 100, // Increased to allow for local keyword filtering
       target_currency: 'EUR',
       target_language: 'EN',
       sort: 'SALE_PRICE_ASC',
     });
 
     // Handle correct response structure: products.traffic_product_d_t_o[]
-    const rawProducts = result.products?.traffic_product_d_t_o ?? [];
+    let rawProducts = result.products?.traffic_product_d_t_o ?? [];
 
     console.log(`[AliExpress DS] Feed response: ${rawProducts.length} products found`);
+
+    // LOCAL KEYWORD FILTERING: Disabled when using Beauty & Health category
+    // Since we're already filtering by category 66 (Beauty & Health), local keyword filtering is too restrictive
+    // The Gemini-based cosmetics filter will handle product validation
+    console.log(`[AliExpress DS] Skipping local keyword filter - using category filter (${enforcedCategoryId})`);
+    console.log(`[AliExpress DS] ${rawProducts.length} products will be validated by Gemini cosmetics filter`);
 
     // Map and filter products
     const products: AliExpressProductData[] = [];
@@ -1199,6 +1270,247 @@ export class AliExpressDSAdapter implements SupplierApi {
         products.push(productData);
       }
     }
+
+    return {
+      products,
+      totalCount: result.total_record_count ?? products.length,
+      currentPage: result.current_page_no ?? 1,
+      totalPages: result.total_page_no ?? 1,
+    };
+  }
+
+  // ============================================================================
+  // Affiliate API - Keyword Search & Best Sellers
+  // ============================================================================
+
+  /**
+   * Search products by keyword using the Affiliate API
+   * Unlike DS recommend feed, this supports:
+   * - Keyword search (serum, moisturizer, etc.)
+   * - Sort by best sellers (LAST_VOLUME_DESC)
+   * - Subcategory filtering
+   * - Price range filtering
+   *
+   * Method: aliexpress.affiliate.product.query
+   */
+
+  /**
+   * Get product details via Affiliate API (fallback when DS API is not available)
+   * Returns data in DSProductDetails format for compatibility with import pipeline
+   * Method: aliexpress.affiliate.productdetail.get
+   */
+  async getAffiliateProductDetail(productId: string): Promise<DSProductDetails | null> {
+    interface AffiliateDetailProduct {
+      product_id?: number;
+      product_title?: string;
+      product_main_image_url?: string;
+      product_small_image_urls?: { string?: string[] };
+      target_sale_price?: string;
+      target_original_price?: string;
+      evaluate_rate?: string;
+      first_level_category_id?: number;
+      first_level_category_name?: string;
+      second_level_category_id?: number;
+      second_level_category_name?: string;
+      shop_id?: number;
+      ship_to_days?: string;
+      lastest_volume?: number;
+    }
+
+    const result = await this.executeRequest<{
+      products?: {
+        product?: AffiliateDetailProduct[];
+      };
+    }>('aliexpress.affiliate.productdetail.get', {
+      product_ids: productId,
+      target_currency: 'EUR',
+      target_language: 'EN',
+      ship_to_country: 'FR',
+      ...(this.config.trackingId && { tracking_id: this.config.trackingId }),
+    });
+
+    const product = result.products?.product?.[0];
+    if (!product) return null;
+
+    // Build image URLs string (semicolon-separated like DS API format)
+    const images: string[] = [];
+    if (product.product_main_image_url) images.push(product.product_main_image_url);
+    if (product.product_small_image_urls?.string) {
+      images.push(...product.product_small_image_urls.string);
+    }
+
+    const price = product.target_sale_price ?? '0';
+
+    // Convert to DSProductDetails format
+    return {
+      ae_item_base_info_dto: {
+        product_id: product.product_id,
+        category_id: product.second_level_category_id ?? product.first_level_category_id,
+        subject: product.product_title,
+        currency_code: 'EUR',
+        product_status_type: 'onSelling',
+      },
+      ae_item_sku_info_dtos: {
+        ae_item_sku_info_d_t_o: [{
+          sku_id: String(product.product_id),
+          sku_price: price,
+          sku_stock: true,
+          currency_code: 'EUR',
+          ipm_sku_stock: 100,
+          offer_sale_price: price,
+        }],
+      },
+      ae_multimedia_info_dto: {
+        image_urls: images.join(';'),
+      },
+      package_info_dto: {
+        gross_weight: '0.3',
+      },
+      logistics_info_dto: {
+        delivery_time: parseInt(product.ship_to_days ?? '20', 10),
+        ship_to_country: 'FR',
+      },
+      ae_store_info: {
+        store_id: product.shop_id,
+        store_name: 'AliExpress',
+        item_as_described_rating: String((parseFloat(product.evaluate_rate ?? '0') / 20).toFixed(1)),
+        communication_rating: '4.5',
+        shipping_speed_rating: '4.5',
+      },
+    };
+  }
+
+  async searchByKeyword(params: {
+    keywords: string;
+    categoryIds?: string;
+    sort?: 'SALE_PRICE_ASC' | 'SALE_PRICE_DESC' | 'LAST_VOLUME_ASC' | 'LAST_VOLUME_DESC';
+    page?: number;
+    pageSize?: number;
+    minPrice?: number;   // In cents (e.g. 100 = $1.00)
+    maxPrice?: number;   // In cents
+    shipToCountry?: string;
+    targetCurrency?: string;
+    targetLanguage?: string;
+    deliveryDays?: number;
+  }): Promise<{
+    products: AliExpressProductData[];
+    totalCount: number;
+    currentPage: number;
+    totalPages: number;
+  }> {
+    const bizParams: Record<string, unknown> = {
+      keywords: params.keywords,
+      page_no: params.page ?? 1,
+      page_size: Math.min(params.pageSize ?? 50, 50), // Max 50 per page
+      sort: params.sort ?? 'LAST_VOLUME_DESC', // Best sellers by default
+      ship_to_country: params.shipToCountry ?? 'FR',
+      target_currency: params.targetCurrency ?? 'EUR',
+      target_language: params.targetLanguage ?? 'EN',
+    };
+
+    if (params.categoryIds) {
+      bizParams.category_ids = params.categoryIds;
+    }
+    if (params.minPrice !== undefined) {
+      bizParams.min_sale_price = params.minPrice;
+    }
+    if (params.maxPrice !== undefined) {
+      bizParams.max_sale_price = params.maxPrice;
+    }
+    if (params.deliveryDays !== undefined) {
+      bizParams.delivery_days = params.deliveryDays;
+    }
+    if (this.config.trackingId) {
+      bizParams.tracking_id = this.config.trackingId;
+    }
+
+    interface AffiliateProduct {
+      product_id?: number;
+      product_title?: string;
+      product_main_image_url?: string;
+      product_small_image_urls?: { string?: string[] };
+      target_sale_price?: string;
+      target_sale_price_currency?: string;
+      target_original_price?: string;
+      target_original_price_currency?: string;
+      sale_price?: string;
+      original_price?: string;
+      evaluate_rate?: string;
+      first_level_category_id?: number;
+      first_level_category_name?: string;
+      second_level_category_id?: number;
+      second_level_category_name?: string;
+      shop_id?: number;
+      shop_url?: string;
+      lastest_volume?: number;  // Note: AliExpress API typo "lastest"
+      discount?: string;
+      promotion_link?: string;
+      product_detail_url?: string;
+      relevant_market_commission_rate?: string;
+    }
+
+    const result = await this.executeRequest<{
+      products?: {
+        product?: AffiliateProduct[];
+      };
+      total_record_count?: number;
+      current_page_no?: number;
+      total_page_no?: number;
+      current_record_count?: number;
+    }>('aliexpress.affiliate.product.query', bizParams);
+
+    const rawProducts = result.products?.product ?? [];
+
+    console.log(`[AliExpress Affiliate] Keyword "${params.keywords}": ${rawProducts.length} products found (total: ${result.total_record_count ?? 0})`);
+
+    // Map to AliExpressProductData and validate cosmetics
+    const products: AliExpressProductData[] = [];
+    for (const p of rawProducts) {
+      const productData: AliExpressProductData = {
+        productId: String(p.product_id ?? ''),
+        title: p.product_title ?? '',
+        description: '',
+        descriptionHtml: '',
+        images: p.product_main_image_url ? [p.product_main_image_url] : [],
+        price: parseFloat(p.target_sale_price ?? p.sale_price ?? '0'),
+        currency: p.target_sale_price_currency ?? 'EUR',
+        categoryId: String(p.second_level_category_id ?? p.first_level_category_id ?? '66'),
+        categoryName: p.second_level_category_name ?? p.first_level_category_name ?? 'Beauty & Health',
+        attributes: [],
+        variants: [],
+        stock: 100,
+        rating: this.parseRating(p.evaluate_rate),
+        reviewCount: 0,
+        orderCount: p.lastest_volume ?? 0,
+        supplierId: String(p.shop_id ?? ''),
+        supplierName: 'AliExpress Seller',
+        supplierRating: 4.5,
+        shippingInfo: {
+          methods: [],
+          minDays: 15,
+          maxDays: 45,
+          defaultCost: 0,
+          freeShippingAvailable: true,
+        },
+        weight: 0.1,
+        dimensions: { length: 10, width: 10, height: 5 },
+      };
+
+      // Validate cosmetic niche
+      const validation = validateCosmeticProduct(
+        productData.title,
+        productData.categoryId,
+        productData.categoryName
+      );
+
+      if (validation.valid) {
+        products.push(productData);
+      } else {
+        console.log(`[AliExpress Affiliate] Rejected: ${productData.title.substring(0, 50)} - ${validation.reason}`);
+      }
+    }
+
+    console.log(`[AliExpress Affiliate] ${products.length}/${rawProducts.length} products passed cosmetics filter`);
 
     return {
       products,

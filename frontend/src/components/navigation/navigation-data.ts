@@ -31,7 +31,7 @@ export const navigationCategories: NavCategory[] = [
   {
     id: 'nouveautes',
     name: 'Nouveautés',
-    href: '/collections',
+    href: '/new-arrivals',
     featured: true,
     image: {
       src: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=400&h=500&fit=crop',
@@ -39,138 +39,90 @@ export const navigationCategories: NavCategory[] = [
     },
   },
   {
+    id: 'best-sellers',
+    name: 'Best Sellers',
+    href: '/collections?sort=best-sellers',
+    featured: true,
+    image: {
+      src: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=400&h=500&fit=crop',
+      alt: 'Nos best sellers',
+    },
+  },
+  {
     id: 'soins',
-    name: 'Soins Visage',
-    href: '/collections/skincare',
+    name: 'Soins',
+    href: '/collections/soins',
     image: {
       src: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400&h=500&fit=crop',
-      alt: 'Soins visage',
+      alt: 'Soins visage et corps',
     },
     subcategories: [
       {
-        name: 'Sérums & Essences',
-        href: '/collections/skincare?sub=serums',
-        description: 'Concentrés actifs haute performance',
+        name: 'Hydratants & Sérums',
+        href: '/collections/soins?sub=hydratants-serums',
+        description: 'Sérums, crèmes et essences hydratantes',
       },
       {
-        name: 'Crèmes Hydratantes',
-        href: '/collections/skincare?sub=moisturizers',
-        description: 'Hydratation luxueuse jour et nuit',
+        name: 'Soins des Yeux',
+        href: '/collections/soins?sub=soins-yeux',
+        description: 'Contour des yeux et regard sublimé',
       },
       {
-        name: 'Masques Visage',
-        href: '/collections/skincare?sub=masks',
+        name: 'Solaires & Autobronzants',
+        href: '/collections/soins?sub=solaires-autobronzants',
+        description: 'Protection UV et teint doré',
+      },
+      {
+        name: 'Démaquillants',
+        href: '/collections/soins?sub=demaquillants',
+        description: 'Nettoyage en douceur',
+      },
+      {
+        name: 'Masques pour le Visage',
+        href: '/collections/soins?sub=masques-visage',
         description: 'Soins intensifs et rituels cocooning',
       },
       {
-        name: 'Nettoyants',
-        href: '/collections/skincare?sub=cleansers',
-        description: 'Double nettoyage et pureté',
-      },
-      {
-        name: 'Contour des Yeux',
-        href: '/collections/skincare?sub=eye-care',
-        description: 'Regard sublimé et défatigué',
-      },
-      {
-        name: 'Protection Solaire',
-        href: '/collections/skincare?sub=sun-protection',
-        description: 'Bouclier anti-UV invisible',
+        name: 'Soins des Mains et du Corps',
+        href: '/collections/soins?sub=mains-corps',
+        description: 'Hydratation et nutrition du corps',
       },
     ],
   },
   {
     id: 'maquillage',
     name: 'Maquillage',
-    href: '/collections/makeup',
+    href: '/collections/maquillage',
     image: {
       src: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=400&h=500&fit=crop',
       alt: 'Maquillage professionnel',
     },
     subcategories: [
       {
-        name: 'Teint & Complexion',
-        href: '/collections/makeup?sub=face-makeup',
+        name: 'Visage',
+        href: '/collections/maquillage?sub=visage',
         description: 'Fonds de teint, poudres et correcteurs',
       },
       {
         name: 'Yeux',
-        href: '/collections/makeup?sub=eye-makeup',
+        href: '/collections/maquillage?sub=yeux',
         description: 'Mascaras, fards et eye-liners',
       },
       {
         name: 'Lèvres',
-        href: '/collections/makeup?sub=lip-makeup',
-        description: 'Rouges à lèvres et gloss',
-      },
-      {
-        name: 'Joues',
-        href: '/collections/makeup?sub=cheek-makeup',
-        description: 'Blush et enlumineurs',
-      },
-      {
-        name: 'Pinceaux & Accessoires',
-        href: '/collections/makeup?sub=makeup-brushes',
-        description: 'Outils de précision',
+        href: '/collections/maquillage?sub=levres',
+        description: 'Rouges à lèvres, gloss et crayons',
       },
     ],
   },
   {
-    id: 'corps',
-    name: 'Soins Corps',
-    href: '/collections/body-care',
+    id: 'parfums',
+    name: 'Parfums',
+    href: '/collections/parfums',
     image: {
-      src: 'https://images.unsplash.com/photo-1571875257727-256c39da42af?w=400&h=500&fit=crop',
-      alt: 'Soins du corps',
+      src: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&h=500&fit=crop',
+      alt: 'Parfums de luxe',
     },
-    subcategories: [
-      {
-        name: 'Hydratants Corps',
-        href: '/collections/body-care?sub=body-moisturizers',
-        description: 'Nutrition intense et peau veloutée',
-      },
-      {
-        name: 'Gommages',
-        href: '/collections/body-care?sub=body-scrubs',
-        description: 'Peau lisse et éclatante',
-      },
-      {
-        name: 'Bain & Douche',
-        href: '/collections/body-care?sub=bath-shower',
-        description: 'Moment de détente absolue',
-      },
-      {
-        name: 'Soin des Mains',
-        href: '/collections/body-care?sub=hand-care',
-        description: 'Mains douces et soignées',
-      },
-    ],
-  },
-  {
-    id: 'outils',
-    name: 'Outils Beauté',
-    href: '/collections/beauty-tools',
-    image: {
-      src: 'https://images.unsplash.com/photo-1581182800629-7d90925ad072?w=400&h=500&fit=crop',
-      alt: 'Outils et accessoires beauté',
-    },
-    subcategories: [
-      {
-        name: 'Massage Visage',
-        href: '/collections/beauty-tools?sub=facial-massage',
-        description: 'Gua Sha, rouleaux de jade',
-      },
-      {
-        name: 'Appareils LED',
-        href: '/collections/beauty-tools?sub=led-devices',
-        description: 'Thérapie lumière professionnelle',
-      },
-      {
-        name: 'Nettoyage',
-        href: '/collections/beauty-tools?sub=cleansing-devices',
-        description: 'Brosses et appareils nettoyants',
-      },
-    ],
   },
 ];
 

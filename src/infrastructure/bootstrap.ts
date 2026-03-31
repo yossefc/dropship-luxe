@@ -27,6 +27,7 @@ import { BullMQAdapter } from '@infrastructure/messaging/bullmq.adapter.js';
 // Adapters - Hyp remplace Stripe
 import { HypAdapter, createHypAdapter } from '@infrastructure/adapters/outbound/payment/hyp.adapter.js';
 import { AliExpressDSAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress-ds.adapter.js';
+import { AliExpressAffiliateAdapter } from '@infrastructure/adapters/outbound/external-apis/aliexpress-affiliate.adapter.js';
 import { OpenAIAdapter } from '@infrastructure/adapters/outbound/external-apis/openai.adapter.js';
 import { createAliExpressOAuthService } from '@infrastructure/adapters/outbound/external-apis/aliexpress-oauth.service.js';
 
@@ -169,9 +170,9 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // AliExpress OAuth Service (pour gestion des tokens)
   const aliexpressOAuthService = createAliExpressOAuthService(prisma);
 
-  // AliExpress DS Adapter - Optional until API keys configured
+  // AliExpress DS Adapter - Optional (requires OAuth token for dropshipping operations)
   let aliexpressAdapter: AliExpressDSAdapter | null = null;
-  if (env.ALIEXPRESS_APP_KEY && env.ALIEXPRESS_APP_SECRET) {
+  if (env.ALIEXPRESS_APP_KEY && env.ALIEXPRESS_APP_SECRET && env.ALIEXPRESS_ACCESS_TOKEN) {
     aliexpressAdapter = new AliExpressDSAdapter({
       appKey: env.ALIEXPRESS_APP_KEY,
       appSecret: env.ALIEXPRESS_APP_SECRET,
@@ -180,7 +181,20 @@ export async function bootstrap(): Promise<BootstrapResult> {
     });
     logger.info('AliExpress DS adapter initialized (with OAuth token refresh)');
   } else {
-    logger.warn('AliExpress adapter not configured - import features disabled');
+    logger.info('AliExpress DS adapter not configured - using Affiliates API for product search');
+  }
+
+  // AliExpress Affiliates Adapter - For product search & discovery (no OAuth needed)
+  let aliexpressAffiliateAdapter: AliExpressAffiliateAdapter | null = null;
+  if (env.ALIEXPRESS_APP_KEY && env.ALIEXPRESS_APP_SECRET) {
+    aliexpressAffiliateAdapter = new AliExpressAffiliateAdapter({
+      appKey: env.ALIEXPRESS_APP_KEY,
+      appSecret: env.ALIEXPRESS_APP_SECRET,
+      trackingId: env.ALIEXPRESS_TRACKING_ID || undefined,
+    });
+    logger.info('AliExpress Affiliates adapter initialized (product search & discovery)');
+  } else {
+    logger.warn('AliExpress adapters not configured - import features disabled');
   }
 
   // OpenAI Adapter - Optional until API key configured
@@ -582,9 +596,15 @@ export async function bootstrap(): Promise<BootstrapResult> {
   // POST /api/admin/imports/run - Trigger manual import
   app.post('/api/admin/imports/run', adminAuth, async (req, res) => {
     try {
-      const { feedName, maxProducts, dryRun, page } = req.body;
+      const {
+        feedName, maxProducts, dryRun, page,
+        useAffiliateSearch, searchKeywords, affiliateSort,
+        categoryId, targetCategories,
+      } = req.body;
 
-      logger.info('Manual import triggered', { feedName, maxProducts, dryRun, page });
+      logger.info('Manual import triggered', {
+        maxProducts, useAffiliateSearch, searchKeywords, affiliateSort,
+      });
 
       // Run import asynchronously
       res.json({ status: 'started', message: 'Import job started' });
@@ -597,6 +617,11 @@ export async function bootstrap(): Promise<BootstrapResult> {
         priceMultiplier: adminSettings.priceMultiplier,
         dryRun: dryRun ?? false,
         page: page ?? 1,
+        useAffiliateSearch: useAffiliateSearch ?? false,
+        searchKeywords,
+        affiliateSort,
+        categoryId,
+        targetCategories,
       });
 
       logger.info('Manual import completed', { result: lastImportResult });

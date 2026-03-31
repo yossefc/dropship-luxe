@@ -35,7 +35,9 @@ export function createProductRouter(prisma: PrismaClient): Router {
             where: { isActive: true },
             take: 5,
           },
-          category: true,
+          category: {
+            include: { parent: true },
+          },
         },
         orderBy: [
           { isFeatured: 'desc' },
@@ -80,6 +82,11 @@ export function createProductRouter(prisma: PrismaClient): Router {
             id: product.category.id,
             name: product.category.name,
             slug: product.category.slug,
+            parent: (product.category as any).parent ? {
+              id: (product.category as any).parent.id,
+              name: (product.category as any).parent.name,
+              slug: (product.category as any).parent.slug,
+            } : null,
           } : null,
           variants: product.variants.map((v) => ({
             id: v.id,
@@ -217,6 +224,11 @@ export function createProductRouter(prisma: PrismaClient): Router {
             id: product.category.id,
             name: product.category.name,
             slug: product.category.slug,
+            parent: (product.category as any).parent ? {
+              id: (product.category as any).parent.id,
+              name: (product.category as any).parent.name,
+              slug: (product.category as any).parent.slug,
+            } : null,
           } : null,
           variants: product.variants.map((v) => ({
             id: v.id,

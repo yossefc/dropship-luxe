@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { Filter, X, ChevronDown, Grid3X3, LayoutGrid, SlidersHorizontal } from 'lucide-react';
 import { BentoGrid, BentoProductCell, BentoCategoryCell } from '@/components/ui/bento-grid-luxe';
-import { fullCatalog, type Category, type SubCategory } from '@/config/catalog-structure';
+// Categories come from API, not hardcoded
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -40,27 +40,13 @@ type ViewMode = 'grid-4' | 'grid-3' | 'grid-2';
 // DATA SOURCE
 // ============================================================================
 
-import { fallbackProducts as importedFallbackProducts, type FallbackProduct } from '@/data/fallback-products';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
-
-// Map fallback products to the expected interface
-const fallbackProducts: Product[] = importedFallbackProducts.map(p => ({
-  id: p.id,
-  slug: p.slug,
-  name: p.name,
-  brand: p.brand,
-  price: p.price,
-  originalPrice: p.originalPrice,
-  currency: p.currency,
-  image: p.image,
-  images: p.images || [p.image],
-  categoryId: p.categoryId,
-  subCategoryId: p.subCategoryId,
-  badge: p.badge,
-  rating: p.rating,
-  importScore: p.importScore,
-}));
+interface ApiCategory {
+  slug: string;
+  name: string;
+  parentSlug?: string;
+}
 
 // ============================================================================
 // COLLECTIONS PAGE COMPONENT
@@ -70,7 +56,8 @@ export default function CollectionsPage() {
   const t = useTranslations();
 
   // State
-  const [products, setProducts] = useState<Product[]>(fallbackProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
@@ -80,28 +67,51 @@ export default function CollectionsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [expandedFilterSections, setExpandedFilterSections] = useState<string[]>(['categories', 'price']);
 
-  // Fetch products
+  // Fetch products from API
   useEffect(() => {
     async function fetchProducts() {
       try {
-        const res = await fetch(`${API_URL}/products`);
+        const res = await fetch(`${API_URL}/products?limit=100`);
         if (!res.ok) throw new Error('Failed to fetch');
 
         const data = await res.json();
         if (data.success && data.data) {
+          // Extract categories from products
+          const catMap = new Map<string, ApiCategory>();
+          for (const p of data.data) {
+            const parentSlug = p.category?.parent?.slug;
+            const parentName = p.category?.parent?.name;
+            const catSlug = p.category?.slug;
+            const catName = p.category?.name;
+
+            // Add parent as main category
+            if (parentSlug && parentName) {
+              catMap.set(parentSlug, { slug: parentSlug, name: parentName });
+            }
+            // Add subcategory
+            if (catSlug && catName && parentSlug) {
+              catMap.set(catSlug, { slug: catSlug, name: catName, parentSlug });
+            }
+            // Direct category (no parent = top level)
+            if (catSlug && catName && !parentSlug) {
+              catMap.set(catSlug, { slug: catSlug, name: catName });
+            }
+          }
+          setCategories(Array.from(catMap.values()));
+
           const mappedProducts: Product[] = data.data.map((p: any) => ({
             id: p.id,
-            slug: p.translations?.[0]?.slug || p.aliexpressId,
-            name: p.translations?.[0]?.name || p.name,
-            brand: p.supplierName || 'Dropship Luxe',
+            slug: p.slug || p.aliexpressId,
+            name: p.name,
+            brand: 'Hayoss',
             price: p.sellingPrice,
-            originalPrice: p.basePrice > p.sellingPrice ? p.basePrice * 2.5 : undefined,
+            originalPrice: p.isFeatured ? Math.round(p.sellingPrice * 1.3) : undefined,
             currency: p.currency || 'EUR',
-            image: p.images?.[0] || '/images/placeholder.jpg',
+            image: p.images?.[0] || '/products/placeholder-luxe.png',
             images: p.images,
-            categoryId: 'skincare', // Default, would come from API
-            subCategoryId: 'serums',
-            badge: p.importScore >= 90 ? 'bestseller' : p.importScore >= 80 ? 'new' : undefined,
+            categoryId: p.category?.parent?.slug ?? p.category?.slug ?? '',
+            subCategoryId: p.category?.parent ? p.category?.slug : '',
+            badge: p.isFeatured ? 'bestseller' : undefined,
             rating: p.rating || 4.5,
             importScore: p.importScore,
           }));
@@ -158,11 +168,13 @@ export default function CollectionsPage() {
   }, [products, selectedCategory, selectedSubCategory, priceRange, sortBy]);
 
   // Get subcategories for selected category
+  const mainCategories = useMemo(() =>
+    categories.filter(c => !c.parentSlug), [categories]);
+
   const currentSubCategories = useMemo(() => {
     if (!selectedCategory) return [];
-    const category = fullCatalog.find(c => c.id === selectedCategory);
-    return category?.subCategories || [];
-  }, [selectedCategory]);
+    return categories.filter(c => c.parentSlug === selectedCategory);
+  }, [selectedCategory, categories]);
 
   // Toggle filter section
   const toggleFilterSection = (sectionId: string) => {
@@ -189,10 +201,26 @@ export default function CollectionsPage() {
     'grid-2': 2,
   };
 
+  // Category card images and descriptions
+  const categoryCards: Record<string, { image: string; description: string }> = {
+    'soins': {
+      image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=800&fit=crop',
+      description: 'Sérums, crèmes hydratantes, masques et soins du corps',
+    },
+    'maquillage': {
+      image: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=600&h=800&fit=crop',
+      description: 'Fond de teint, mascara, rouge à lèvres et palettes',
+    },
+    'parfums': {
+      image: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=600&h=800&fit=crop',
+      description: 'Eaux de parfum, eaux de toilette et brumes corporelles',
+    },
+  };
+
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <section className="relative h-[40vh] min-h-[320px] bg-[#F5F4F2] flex items-center justify-center overflow-hidden">
+      <section className="relative h-[35vh] min-h-[280px] bg-[#F5F4F2] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/20" />
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -201,50 +229,122 @@ export default function CollectionsPage() {
           className="relative text-center px-6"
         >
           <span className="text-xs font-medium tracking-[0.3em] uppercase text-[#B76E79] mb-4 block">
-            Notre Collection
+            Nos Collections
           </span>
           <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-[#1A1A1A] font-light">
             {selectedCategory
-              ? fullCatalog.find(c => c.id === selectedCategory)?.nameFR
-              : 'Tous les Produits'}
+              ? mainCategories.find(c => c.slug === selectedCategory)?.name ?? selectedCategory
+              : 'Découvrez nos Univers'}
           </h1>
-          <p className="mt-4 text-neutral-600 max-w-lg mx-auto">
-            Découvrez notre sélection de produits cosmétiques premium,
-            soigneusement choisis pour sublimer votre beauté naturelle.
-          </p>
+          {selectedCategory && (
+            <button
+              onClick={() => { setSelectedCategory(null); setSelectedSubCategory(null); }}
+              className="mt-4 text-sm text-[#B76E79] hover:underline"
+            >
+              ← Toutes les collections
+            </button>
+          )}
         </motion.div>
       </section>
 
-      {/* Categories Bar */}
-      <section className="border-b border-neutral-200 sticky top-16 bg-white z-30">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8">
-          <div className="flex items-center gap-6 overflow-x-auto py-4 scrollbar-hide">
-            <button
-              onClick={() => { setSelectedCategory(null); setSelectedSubCategory(null); }}
-              className={cn(
-                'flex-shrink-0 text-sm font-medium tracking-wide transition-colors',
-                !selectedCategory ? 'text-[#B76E79]' : 'text-neutral-600 hover:text-[#1A1A1A]'
-              )}
-            >
-              Tous
-            </button>
-            {fullCatalog.map(category => (
-              <button
-                key={category.id}
-                onClick={() => { setSelectedCategory(category.id); setSelectedSubCategory(null); }}
-                className={cn(
-                  'flex-shrink-0 text-sm font-medium tracking-wide transition-colors',
-                  selectedCategory === category.id ? 'text-[#B76E79]' : 'text-neutral-600 hover:text-[#1A1A1A]'
-                )}
-              >
-                {category.nameFR}
-              </button>
+      {/* CATEGORY CARDS — shown when no category is selected */}
+      {!selectedCategory && (
+        <section className="max-w-[1200px] mx-auto px-4 md:px-8 py-16">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {mainCategories.map(cat => {
+              const card = categoryCards[cat.slug];
+              const productCount = products.filter(p => p.categoryId === cat.slug).length;
+              return (
+                <motion.button
+                  key={cat.slug}
+                  onClick={() => { setSelectedCategory(cat.slug); setSelectedSubCategory(null); }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ y: -4 }}
+                  className="group relative overflow-hidden rounded-xl bg-[#F5F4F2] text-left"
+                >
+                  {/* Image */}
+                  <div className="aspect-[3/4] overflow-hidden">
+                    <img
+                      src={card?.image ?? 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=600&h=800&fit=crop'}
+                      alt={cat.name}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                  </div>
+                  {/* Content */}
+                  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+                    <h2 className="font-serif text-2xl md:text-3xl font-light mb-1">{cat.name}</h2>
+                    <p className="text-sm text-white/80 mb-2">{card?.description ?? ''}</p>
+                    <span className="text-xs text-white/60">{productCount} produit{productCount > 1 ? 's' : ''}</span>
+                    <div className="mt-3 flex items-center gap-2 text-sm font-medium text-[#D4A574]">
+                      Découvrir
+                      <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                  </div>
+                </motion.button>
+              );
+            })}
+          </div>
+
+          {/* Subcategories quick links */}
+          <div className="mt-16 space-y-10">
+            {mainCategories.filter(cat => categories.some(c => c.parentSlug === cat.slug)).map(cat => (
+              <div key={cat.slug}>
+                <h3 className="font-serif text-xl text-[#1A1A1A] mb-4">{cat.name}</h3>
+                <div className="flex flex-wrap gap-3">
+                  {categories.filter(c => c.parentSlug === cat.slug).map(sub => {
+                    const subCount = products.filter(p => p.subCategoryId === sub.slug).length;
+                    return (
+                      <button
+                        key={sub.slug}
+                        onClick={() => { setSelectedCategory(cat.slug); setSelectedSubCategory(sub.slug); }}
+                        className="px-4 py-2 rounded-full border border-neutral-200 text-sm text-neutral-600 hover:border-[#B76E79] hover:text-[#B76E79] transition-colors"
+                      >
+                        {sub.name} ({subCount})
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      {/* Main Content */}
+      {/* PRODUCT GRID — shown when a category IS selected */}
+      {selectedCategory && (
+        <>
+          {/* Subcategory bar */}
+          <section className="border-b border-neutral-200 sticky top-16 bg-white z-30">
+            <div className="max-w-[1440px] mx-auto px-4 md:px-8">
+              <div className="flex items-center gap-6 overflow-x-auto py-4 scrollbar-hide">
+                <button
+                  onClick={() => setSelectedSubCategory(null)}
+                  className={cn(
+                    'flex-shrink-0 text-sm font-medium tracking-wide transition-colors',
+                    !selectedSubCategory ? 'text-[#B76E79]' : 'text-neutral-600 hover:text-[#1A1A1A]'
+                  )}
+                >
+                  Tout voir
+                </button>
+                {currentSubCategories.map(sub => (
+                  <button
+                    key={sub.slug}
+                    onClick={() => setSelectedSubCategory(sub.slug === selectedSubCategory ? null : sub.slug)}
+                    className={cn(
+                      'flex-shrink-0 text-sm font-medium tracking-wide transition-colors',
+                      selectedSubCategory === sub.slug ? 'text-[#B76E79]' : 'text-neutral-600 hover:text-[#1A1A1A]'
+                    )}
+                  >
+                    {sub.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
       <section className="max-w-[1440px] mx-auto px-4 md:px-8 py-8 md:py-12">
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-4 mb-8">
@@ -380,17 +480,17 @@ export default function CollectionsPage() {
                           className="overflow-hidden"
                         >
                           <div className="pt-2 space-y-2">
-                            {fullCatalog.map(category => (
-                              <label key={category.id} className="flex items-center gap-3 cursor-pointer group">
+                            {mainCategories.map(category => (
+                              <label key={category.slug} className="flex items-center gap-3 cursor-pointer group">
                                 <input
                                   type="radio"
                                   name="category"
-                                  checked={selectedCategory === category.id}
-                                  onChange={() => { setSelectedCategory(category.id); setSelectedSubCategory(null); }}
+                                  checked={selectedCategory === category.slug}
+                                  onChange={() => { setSelectedCategory(category.slug); setSelectedSubCategory(null); }}
                                   className="w-4 h-4 text-[#B76E79] border-neutral-300 focus:ring-[#B76E79]"
                                 />
                                 <span className="text-sm text-neutral-600 group-hover:text-[#1A1A1A]">
-                                  {category.nameFR}
+                                  {category.name}
                                 </span>
                               </label>
                             ))}
@@ -543,6 +643,8 @@ export default function CollectionsPage() {
           </div>
         </div>
       </section>
+        </>
+      )}
     </div>
   );
 }

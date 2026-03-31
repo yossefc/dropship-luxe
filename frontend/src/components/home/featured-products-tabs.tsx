@@ -23,7 +23,7 @@ interface Product {
   currency: string;
   image: string;
   hoverImage?: string;
-  category: 'skincare' | 'makeup' | 'all';
+  category: 'soins' | 'maquillage' | 'parfums' | 'all';
   badge?: 'new' | 'bestseller' | 'sale' | 'limited';
   rating?: number;
 }
@@ -118,12 +118,13 @@ const fallbackProducts: Product[] = [
 // Component
 // ============================================================================
 
-type TabType = 'all' | 'skincare' | 'makeup';
+type TabType = 'all' | 'soins' | 'maquillage' | 'parfums';
 
 const tabs: { id: TabType; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'skincare', label: 'Skincare' },
-  { id: 'makeup', label: 'Makeup' },
+  { id: 'all', label: 'Tout' },
+  { id: 'soins', label: 'Soins' },
+  { id: 'maquillage', label: 'Maquillage' },
+  { id: 'parfums', label: 'Parfums' },
 ];
 
 export function FeaturedProductsTabs({

@@ -16,6 +16,14 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: '**.aliexpress-media.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.aliexpress.com',
+      },
+      {
+        protocol: 'https',
         hostname: 'images.unsplash.com',
       },
       {
