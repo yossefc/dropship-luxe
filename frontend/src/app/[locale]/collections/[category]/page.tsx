@@ -1,536 +1,251 @@
 'use client';
 
-// ============================================================================
-// DYNAMIC CATEGORY COLLECTION PAGE - Design Luxe Chaleureux
-// ============================================================================
-// Route dynamique pour /collections/skincare, /collections/makeup, etc.
-// Esthetique premium : Rose Gold Romance, typographie Serif elegante
-// Composants modulaires pour un code propre et maintenable
-// ============================================================================
-
 import { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useLocale } from 'next-intl';
-import Link from 'next/link';
-import { ChevronRight, Sparkles } from 'lucide-react';
-import {
-  CollectionHero,
-  CollectionFilters,
-  ProductGridLuxe,
-  ProductSkeletonGrid,
-  type SortOption,
-} from '@/components/collection';
+import { Link } from '@/i18n/routing';
+import { cn } from '@/lib/utils';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-
-// ============================================================================
-// TYPES
-// ============================================================================
 
 interface Product {
   id: string;
   slug: string;
   name: string;
-  brand: string;
   price: number;
   originalPrice?: number;
   currency: string;
   image: string;
-  hoverImage?: string;
-  images?: string[];
-  categoryId: string;
-  subCategoryId: string;
-  badge?: 'new' | 'bestseller' | 'sale' | 'limited';
+  categorySlug: string;
   rating?: number;
-  reviewCount?: number;
-  colorSwatches?: Array<{ name: string; hex: string }>;
-  importScore?: number;
-  createdAt?: string;
+  isFeatured?: boolean;
 }
 
-// ============================================================================
-// API URL
-// ============================================================================
-
-// API_URL is defined above as API_BASE
-
-// ============================================================================
-// HELPER FUNCTIONS (moved before component for TypeScript compatibility)
-// ============================================================================
-
-function generateColorSwatches(productName: string): Array<{ name: string; hex: string }> | undefined {
-  const name = productName.toLowerCase();
-
-  if (name.includes('fond de teint') || name.includes('foundation') || name.includes('concealer')) {
-    return [
-      { name: 'Porcelaine', hex: '#F5E6D3' },
-      { name: 'Ivoire', hex: '#EAD9C4' },
-      { name: 'Beige', hex: '#D4B896' },
-      { name: 'Caramel', hex: '#B8926A' },
-    ];
-  }
-
-  if (name.includes('rouge') || name.includes('lipstick') || name.includes('levres')) {
-    return [
-      { name: 'Nude Rose', hex: '#C4908B' },
-      { name: 'Corail', hex: '#E07B67' },
-      { name: 'Berry', hex: '#8B3A5B' },
-    ];
-  }
-
-  return undefined;
+interface SubCat {
+  slug: string;
+  name: string;
+  count: number;
 }
-
-// ============================================================================
-// CATEGORY COLLECTION PAGE COMPONENT
-// ============================================================================
 
 export default function CategoryCollectionPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const locale = useLocale();
   const categorySlug = params.category as string;
+  const initialSub = searchParams.get('sub');
 
-  // Category info fetched from API
-  const [category, setCategory] = useState<{ id: string; name: string; slug: string; subCategories: Array<{ id: string; slug: string; name: string }> } | null>(null);
-
-  // State
   const [products, setProducts] = useState<Product[]>([]);
+  const [subCategories, setSubCategories] = useState<SubCat[]>([]);
+  const [selectedSub, setSelectedSub] = useState<string | null>(initialSub);
+  const [sortBy, setSortBy] = useState('featured');
   const [loading, setLoading] = useState(true);
-  const [selectedSubCategory, setSelectedSubCategory] = useState<string | null>(null);
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
-  const [sortBy, setSortBy] = useState<SortOption>('featured');
 
-  // Fetch products for this category slug
+  const catNames: Record<string, string> = {
+    'soins': 'Soins',
+    'maquillage': 'Maquillage',
+    'parfums': 'Parfums',
+  };
+  const categoryName = catNames[categorySlug] ?? categorySlug;
+
+  // Fetch products
   useEffect(() => {
-    async function fetchProducts() {
+    async function load() {
       setLoading(true);
       try {
-        // Fetch all products and filter by category slug on the client
         const res = await fetch(`${API_BASE}/products?limit=100`);
-        if (!res.ok) throw new Error('Failed to fetch');
-
+        if (!res.ok) throw new Error('API error');
         const data = await res.json();
+
         if (data.success && data.data) {
-          // Find products matching this category slug (either direct or parent)
-          const categoryProducts = data.data.filter((p: any) => {
-            const catSlug = p.category?.slug;
+          // Filter by parent category
+          const catProducts = data.data.filter((p: any) => {
+            const slug = p.category?.slug;
             const parentSlug = p.category?.parent?.slug;
-            return catSlug === categorySlug || parentSlug === categorySlug;
+            return slug === categorySlug || parentSlug === categorySlug;
           });
 
-          // Build category info from products
-          const subCats = new Map<string, { id: string; slug: string; name: string }>();
-          for (const p of categoryProducts) {
+          // Build subcategories with counts
+          const subMap = new Map<string, { name: string; count: number }>();
+          for (const p of catProducts) {
             if (p.category?.parent?.slug === categorySlug) {
-              subCats.set(p.category.slug, {
-                id: p.category.id,
-                slug: p.category.slug,
-                name: p.category.name,
-              });
+              const s = subMap.get(p.category.slug) || { name: p.category.name, count: 0 };
+              s.count++;
+              subMap.set(p.category.slug, s);
             }
           }
+          setSubCategories(Array.from(subMap.entries()).map(([slug, v]) => ({ slug, ...v })));
 
-          // Category display name
-          const catNames: Record<string, string> = {
-            'soins': 'Soins',
-            'maquillage': 'Maquillage',
-            'parfums': 'Parfums',
-          };
-
-          setCategory({
-            id: categorySlug,
-            name: catNames[categorySlug] ?? categorySlug,
-            slug: categorySlug,
-            subCategories: Array.from(subCats.values()),
-          });
-
-          const mappedProducts: Product[] = categoryProducts.map((p: any) => ({
+          // Map products
+          setProducts(catProducts.map((p: any) => ({
             id: p.id,
             slug: p.slug || p.aliexpressId,
             name: p.name,
-            brand: 'Hayoss',
             price: Number(p.sellingPrice),
             originalPrice: p.isFeatured ? Math.round(Number(p.sellingPrice) * 1.3) : undefined,
             currency: p.currency || 'EUR',
             image: p.images?.[0] || '/products/placeholder-luxe.png',
-            hoverImage: p.images?.[1],
-            images: p.images,
-            categoryId: p.category?.id ?? '',
-            subCategoryId: p.category?.slug ?? 'general',
-            badge: p.isFeatured ? 'bestseller' : undefined,
+            categorySlug: p.category?.slug ?? '',
             rating: Number(p.rating) || 4.5,
-            reviewCount: p.orderVolume || 0,
-            colorSwatches: generateColorSwatches(p.name),
-            importScore: p.importScore,
-            createdAt: p.createdAt,
-          }));
-          setProducts(mappedProducts);
+            isFeatured: p.isFeatured,
+          })));
         }
-      } catch (error) {
-        console.error('Error fetching products:', error);
+      } catch (e) {
+        console.error('Fetch error:', e);
       } finally {
         setLoading(false);
       }
     }
-
-    fetchProducts();
+    load();
   }, [categorySlug]);
 
-  // Filter and sort products
-  const filteredProducts = useMemo(() => {
+  // Read sub from URL on mount
+  useEffect(() => {
+    if (initialSub) setSelectedSub(initialSub);
+  }, [initialSub]);
+
+  // Filter + sort
+  const filtered = useMemo(() => {
     let result = [...products];
-
-    // Sub-category filter
-    if (selectedSubCategory) {
-      result = result.filter(p => p.subCategoryId === selectedSubCategory);
+    if (selectedSub) {
+      result = result.filter(p => p.categorySlug === selectedSub);
     }
-
-    // Price filter
-    result = result.filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
-
-    // Sort
     switch (sortBy) {
-      case 'price-asc':
-        result.sort((a, b) => a.price - b.price);
-        break;
-      case 'price-desc':
-        result.sort((a, b) => b.price - a.price);
-        break;
-      case 'newest':
-        result.sort((a, b) => {
-          if (a.createdAt && b.createdAt) {
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          }
-          return b.id.localeCompare(a.id);
-        });
-        break;
-      case 'rating':
-        result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-        break;
-      case 'featured':
-      default:
-        result.sort((a, b) => (b.importScore || 0) - (a.importScore || 0));
+      case 'price-asc': result.sort((a, b) => a.price - b.price); break;
+      case 'price-desc': result.sort((a, b) => b.price - a.price); break;
+      default: break;
     }
-
     return result;
-  }, [products, selectedSubCategory, priceRange, sortBy]);
-
-  // 404 if category not found
-  if (!category) {
-    return (
-      <div className="min-h-screen bg-[#FFFBF7] flex items-center justify-center">
-        <div className="text-center px-6">
-          <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#F5EDE8] flex items-center justify-center">
-            <Sparkles className="w-10 h-10 text-[#B76E79]" />
-          </div>
-          <h1 className="font-serif text-4xl text-[#2D2926] mb-4">Collection introuvable</h1>
-          <p className="text-[#6B5B54] mb-8">Cette categorie n&apos;existe pas ou a ete deplacee.</p>
-          <Link
-            href="/collections"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#B76E79] text-white rounded-lg hover:bg-[#A37E68] transition-colors"
-          >
-            Voir toutes les collections
-            <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  }, [products, selectedSub, sortBy]);
 
   return (
-    <div className="min-h-screen bg-[#FFFBF7]">
-      {/* Hero Header - Composant Modulaire */}
-      <CollectionHero
-        category={category}
-        productCount={filteredProducts.length}
-      />
+    <div className="min-h-screen bg-white">
+      {/* Header — compact */}
+      <div className="bg-[#F5F4F2] py-6 text-center">
+        <h1 className="font-serif text-2xl text-[#1A1A1A]">{categoryName}</h1>
+        <p className="text-xs text-neutral-500 mt-1">{products.length} produits</p>
+      </div>
 
-      {/* Sticky Filters Bar - Composant Modulaire */}
-      <CollectionFilters
-        category={category}
-        sortBy={sortBy}
-        onSortChange={setSortBy}
-        selectedSubCategory={selectedSubCategory}
-        onSubCategoryChange={setSelectedSubCategory}
-        priceRange={priceRange}
-        onPriceRangeChange={setPriceRange}
-        totalProducts={filteredProducts.length}
-      />
-
-      {/* Main Content Area */}
-      <main className="max-w-[1200px] mx-auto px-4 md:px-8 py-12 md:py-16">
-        <AnimatePresence mode="wait">
-          {loading ? (
-            <ProductSkeletonGrid key="skeleton" count={8} />
-          ) : filteredProducts.length === 0 ? (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="text-center py-20"
+      {/* Subcategory bar */}
+      {subCategories.length > 0 && (
+        <div className="border-b border-neutral-100 bg-white sticky top-[128px] z-20">
+          <div className="max-w-[1200px] mx-auto px-4 flex items-center gap-0 overflow-x-auto">
+            <button
+              onClick={() => setSelectedSub(null)}
+              className={cn(
+                'px-4 py-2.5 text-[11px] tracking-[0.08em] uppercase whitespace-nowrap transition-colors border-b-2',
+                !selectedSub
+                  ? 'text-[#1A1A1A] border-[#1A1A1A] font-medium'
+                  : 'text-neutral-400 border-transparent hover:text-[#1A1A1A]'
+              )}
             >
-              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#F5EDE8] flex items-center justify-center">
-                <Sparkles className="w-10 h-10 text-[#B76E79]" />
-              </div>
-              <h3 className="font-serif text-2xl text-[#2D2926] mb-3">
-                {locale === 'fr' ? 'Aucun produit trouve' : 'No products found'}
-              </h3>
-              <p className="text-[#6B5B54] max-w-md mx-auto mb-8">
-                {locale === 'fr'
-                  ? 'Essayez de modifier vos filtres pour decouvrir d\'autres merveilles.'
-                  : 'Try adjusting your filters to discover other treasures.'
-                }
-              </p>
+              Tout ({products.length})
+            </button>
+            {subCategories.map(sub => (
               <button
-                onClick={() => {
-                  setSelectedSubCategory(null);
-                  setPriceRange([0, 500]);
-                  setSortBy('featured');
-                }}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-[#B76E79] text-white rounded-lg hover:bg-[#A37E68] transition-colors"
+                key={sub.slug}
+                onClick={() => setSelectedSub(sub.slug === selectedSub ? null : sub.slug)}
+                className={cn(
+                  'px-4 py-2.5 text-[11px] tracking-[0.08em] uppercase whitespace-nowrap transition-colors border-b-2',
+                  selectedSub === sub.slug
+                    ? 'text-[#1A1A1A] border-[#1A1A1A] font-medium'
+                    : 'text-neutral-400 border-transparent hover:text-[#1A1A1A]'
+                )}
               >
-                {locale === 'fr' ? 'Reinitialiser les filtres' : 'Reset filters'}
+                {sub.name} ({sub.count})
               </button>
-            </motion.div>
-          ) : (
-            <ProductGridLuxe
-              key="products"
-              products={filteredProducts}
-            />
-          )}
-        </AnimatePresence>
-      </main>
-
-      {/* Related Collections Section */}
-      <section className="bg-[#F5EDE8] py-16 md:py-24">
-        <div className="max-w-[1200px] mx-auto px-4 md:px-8">
-          <div className="text-center mb-12">
-            <h2 className="font-serif text-3xl md:text-4xl text-[#2D2926] mb-4">
-              {locale === 'fr' ? 'Explorer d\'autres collections' : 'Explore other collections'}
-            </h2>
-            <p className="text-[#6B5B54] max-w-lg mx-auto">
-              {locale === 'fr'
-                ? 'Decouvrez nos autres gammes de produits soigneusement selectionnes.'
-                : 'Discover our other ranges of carefully selected products.'
-              }
-            </p>
+            ))}
           </div>
+        </div>
+      )}
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      {/* Sort bar */}
+      <div className="max-w-[1200px] mx-auto px-4 py-3 flex items-center justify-between">
+        <span className="text-[11px] text-neutral-400">{filtered.length} produit{filtered.length > 1 ? 's' : ''}</span>
+        <select
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value)}
+          className="text-[11px] text-neutral-600 border-0 bg-transparent focus:outline-none cursor-pointer"
+        >
+          <option value="featured">Mis en avant</option>
+          <option value="price-asc">Prix croissant</option>
+          <option value="price-desc">Prix décroissant</option>
+        </select>
+      </div>
+
+      {/* Products grid */}
+      <div className="max-w-[1200px] mx-auto px-4 pb-12">
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="aspect-square bg-neutral-100 rounded-lg mb-2" />
+                <div className="h-3 bg-neutral-100 rounded w-3/4 mb-1" />
+                <div className="h-3 bg-neutral-100 rounded w-1/2" />
+              </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-neutral-400 text-sm mb-3">Aucun produit trouvé</p>
+            <button
+              onClick={() => setSelectedSub(null)}
+              className="text-xs text-[#B76E79] hover:underline"
+            >
+              Voir tous les {categoryName.toLowerCase()}
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-6">
+            {filtered.map(p => (
+              <Link
+                key={p.id}
+                href={`/products/${p.slug}`}
+                className="group"
+              >
+                <div className="aspect-square bg-[#F5F4F2] rounded-lg overflow-hidden mb-2">
+                  <img
+                    src={p.image}
+                    alt={p.name}
+                    className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                </div>
+                <h3 className="text-[12px] text-[#1A1A1A] leading-tight line-clamp-2 mb-1">{p.name}</h3>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[12px] font-medium text-[#1A1A1A]">{p.price.toFixed(2)} €</span>
+                  {p.originalPrice && (
+                    <span className="text-[10px] text-neutral-400 line-through">{p.originalPrice.toFixed(2)} €</span>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Other collections */}
+      <div className="bg-[#F5F4F2] py-8">
+        <div className="max-w-[1200px] mx-auto px-4">
+          <h2 className="font-serif text-lg text-[#1A1A1A] mb-4">Autres collections</h2>
+          <div className="grid grid-cols-3 gap-3">
             {[
               { slug: 'soins', name: 'Soins' },
               { slug: 'maquillage', name: 'Maquillage' },
               { slug: 'parfums', name: 'Parfums' },
             ]
-              .filter(cat => cat.slug !== categorySlug)
-              .map((cat) => (
+              .filter(c => c.slug !== categorySlug)
+              .map(c => (
                 <Link
-                  key={cat.slug}
-                  href={`/collections/${cat.slug}`}
-                  className="group relative aspect-[3/2] rounded-lg overflow-hidden bg-[#F5F4F2] hover:shadow-md transition-all"
+                  key={c.slug}
+                  href={`/collections/${c.slug}`}
+                  className="py-3 text-center text-[11px] tracking-[0.08em] uppercase text-neutral-600 hover:text-[#1A1A1A] border border-neutral-200 rounded hover:border-[#1A1A1A] transition-colors"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#1A1A1A]/50 to-transparent z-10" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
-                    <h3 className="font-serif text-lg text-white group-hover:translate-y-[-2px] transition-transform">
-                      {cat.name}
-                    </h3>
-                  </div>
+                  {c.name}
                 </Link>
               ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Decorative footer divider */}
-      <div className="bg-[#FFFBF7] py-12">
-        <div className="max-w-[1200px] mx-auto px-4 md:px-8">
-          <div className="flex items-center justify-center gap-4">
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#D4C4B5] to-transparent" />
-            <div className="w-2 h-2 rounded-full bg-[#B76E79]" />
-            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-[#D4C4B5] to-transparent" />
           </div>
         </div>
       </div>
     </div>
   );
-}
-
-// ============================================================================
-// FALLBACK PRODUCTS FOR OFFLINE/ERROR STATES
-// ============================================================================
-
-function getFallbackProducts(categoryId: string): Product[] {
-  const skincareFallback: Product[] = [
-    {
-      id: '1',
-      slug: 'serum-eclat-vitamine-c',
-      name: 'Serum Eclat Vitamine C',
-      brand: 'Dropship Luxe',
-      price: 89,
-      originalPrice: 119,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=600&h=800&fit=crop',
-      hoverImage: 'https://images.unsplash.com/photo-1617897903246-719242758050?w=600&h=800&fit=crop',
-      categoryId: 'skincare',
-      subCategoryId: 'serums',
-      badge: 'bestseller',
-      rating: 4.8,
-      reviewCount: 127,
-      importScore: 95,
-    },
-    {
-      id: '2',
-      slug: 'creme-nuit-regenerante',
-      name: 'Creme Nuit Regenerante',
-      brand: 'Dropship Luxe',
-      price: 125,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1611930022073-b7a4ba5fcccd?w=600&h=800&fit=crop',
-      categoryId: 'skincare',
-      subCategoryId: 'moisturizers',
-      badge: 'new',
-      rating: 4.9,
-      reviewCount: 89,
-      importScore: 92,
-    },
-    {
-      id: '3',
-      slug: 'huile-visage-rose-musquee',
-      name: 'Huile Visage Rose Musquee',
-      brand: 'Dropship Luxe',
-      price: 75,
-      originalPrice: 95,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=600&h=800&fit=crop',
-      hoverImage: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=600&h=800&fit=crop',
-      categoryId: 'skincare',
-      subCategoryId: 'oils',
-      rating: 4.7,
-      reviewCount: 64,
-      importScore: 88,
-    },
-    {
-      id: '4',
-      slug: 'masque-hydratant-aloe-vera',
-      name: 'Masque Hydratant Aloe Vera',
-      brand: 'Dropship Luxe',
-      price: 45,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1596755389378-c31d21fd1273?w=600&h=800&fit=crop',
-      categoryId: 'skincare',
-      subCategoryId: 'masks',
-      badge: 'new',
-      rating: 4.6,
-      reviewCount: 53,
-      importScore: 85,
-    },
-    {
-      id: '5',
-      slug: 'lotion-tonique-purifiante',
-      name: 'Lotion Tonique Purifiante',
-      brand: 'Dropship Luxe',
-      price: 55,
-      originalPrice: 70,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1612817288484-6f916006741a?w=600&h=800&fit=crop',
-      categoryId: 'skincare',
-      subCategoryId: 'toners',
-      rating: 4.5,
-      reviewCount: 41,
-      importScore: 82,
-    },
-    {
-      id: '6',
-      slug: 'creme-contour-yeux',
-      name: 'Creme Contour des Yeux',
-      brand: 'Dropship Luxe',
-      price: 98,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1601049541289-9b1b7bbbfe19?w=600&h=800&fit=crop',
-      categoryId: 'skincare',
-      subCategoryId: 'eye-care',
-      badge: 'bestseller',
-      rating: 4.9,
-      reviewCount: 112,
-      importScore: 94,
-    },
-  ];
-
-  const makeupFallback: Product[] = [
-    {
-      id: '7',
-      slug: 'fond-teint-velours-mat',
-      name: 'Fond de Teint Velours Mat',
-      brand: 'Dropship Luxe',
-      price: 65,
-      originalPrice: 85,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1631214524020-7e18db9a8f92?w=600&h=800&fit=crop',
-      categoryId: 'makeup',
-      subCategoryId: 'face-makeup',
-      badge: 'bestseller',
-      rating: 4.7,
-      reviewCount: 98,
-      colorSwatches: [
-        { name: 'Porcelaine', hex: '#F5E6D3' },
-        { name: 'Ivoire', hex: '#EAD9C4' },
-        { name: 'Beige', hex: '#D4B896' },
-        { name: 'Caramel', hex: '#B8926A' },
-      ],
-      importScore: 89,
-    },
-    {
-      id: '8',
-      slug: 'baume-levres-nourrissant',
-      name: 'Baume Levres Nourrissant',
-      brand: 'Dropship Luxe',
-      price: 28,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=600&h=800&fit=crop',
-      categoryId: 'makeup',
-      subCategoryId: 'lip-makeup',
-      badge: 'new',
-      rating: 4.8,
-      reviewCount: 156,
-      importScore: 91,
-    },
-    {
-      id: '9',
-      slug: 'palette-fards-paupieres-nude',
-      name: 'Palette Fards a Paupieres Nude',
-      brand: 'Dropship Luxe',
-      price: 78,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1596704017254-9b121068fb31?w=600&h=800&fit=crop',
-      categoryId: 'makeup',
-      subCategoryId: 'eye-makeup',
-      rating: 4.6,
-      reviewCount: 73,
-      importScore: 86,
-    },
-    {
-      id: '10',
-      slug: 'set-pinceaux-or-rose',
-      name: 'Set 15 Pinceaux Or Rose',
-      brand: 'Dropship Luxe',
-      price: 58,
-      originalPrice: 75,
-      currency: 'EUR',
-      image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=600&h=800&fit=crop',
-      categoryId: 'makeup',
-      subCategoryId: 'makeup-brushes',
-      badge: 'bestseller',
-      rating: 4.9,
-      reviewCount: 201,
-      importScore: 95,
-    },
-  ];
-
-  if (categoryId === 'makeup') {
-    return makeupFallback;
-  }
-
-  return skincareFallback;
 }
