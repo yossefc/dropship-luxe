@@ -119,16 +119,17 @@ export default function CategoryCollectionPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* Header — compact */}
-      <div className="bg-[#F5F4F2] py-6 text-center">
-        <h1 className="font-serif text-2xl text-[#1A1A1A]">{categoryName}</h1>
-        <p className="text-xs text-neutral-500 mt-1">{products.length} produits</p>
-      </div>
-
-      {/* Subcategory bar */}
-      {subCategories.length > 0 && (
-        <div className="border-b border-neutral-100 bg-white sticky top-[128px] z-20">
-          <div className="max-w-[1200px] mx-auto px-4 flex items-center gap-0 overflow-x-auto">
+      {/* Breadcrumb + Category nav — all in one bar, like Clinique */}
+      <div className="border-b border-neutral-100 bg-white sticky top-[104px] lg:top-[128px] z-20">
+        <div className="max-w-[1200px] mx-auto px-4">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-1.5 pt-2 pb-1">
+            <Link href="/collections" className="text-[10px] text-neutral-400 hover:text-[#1A1A1A]">Collections</Link>
+            <span className="text-[10px] text-neutral-300">/</span>
+            <span className="text-[10px] text-[#1A1A1A] font-medium">{categoryName}</span>
+          </div>
+          {/* Subcategory tabs */}
+          <div className="flex items-center gap-0 overflow-x-auto -mb-px">
             <button
               onClick={() => setSelectedSub(null)}
               className={cn(
@@ -156,7 +157,7 @@ export default function CategoryCollectionPage() {
             ))}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Sort bar */}
       <div className="max-w-[1200px] mx-auto px-4 py-3 flex items-center justify-between">
