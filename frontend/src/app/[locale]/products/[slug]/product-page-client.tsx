@@ -283,51 +283,84 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                 )}
               </div>
 
-              {/* Variants — text buttons with color name, click to show image */}
-              {product.sizes && product.sizes.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-neutral-500 mb-2 uppercase tracking-wide">
-                    {selectedVariant ? `Sélection : ${selectedVariant.label}` : 'Choisir une option'}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {product.sizes.map((size: any) => {
-                      const isSelected = selectedVariant?.id === size.id;
-                      const colorHex = size.attributes?.colorHex;
-                      const displayName = /^\d+$/.test(size.label) ? `Teinte ${size.label}` : size.label;
-                      return (
-                        <button
-                          key={size.id}
-                          onClick={() => {
-                            setSelectedVariant(isSelected ? null : { ...size, label: displayName });
-                            if (size.image && !isSelected) setDisplayImage(size.image);
-                            else setDisplayImage(product.images[0]);
-                          }}
-                          className={cn(
-                            'flex items-center gap-1.5 px-2.5 py-1 text-[11px] rounded-full border transition-all',
-                            isSelected
-                              ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
-                              : size.available
-                                ? 'border-neutral-200 hover:border-[#B76E79] text-neutral-600'
-                                : 'border-neutral-100 text-neutral-300 cursor-not-allowed opacity-40'
-                          )}
-                          disabled={!size.available}
-                        >
-                          {colorHex && (
-                            <span
-                              className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-neutral-300"
-                              style={{ backgroundColor: colorHex }}
-                            />
-                          )}
-                          {displayName}
-                        </button>
-                      );
-                    })}
+              {/* Variants — Clinique style: color circles only, text for non-colors */}
+              {product.sizes && product.sizes.length > 0 && (() => {
+                const colorVariants = product.sizes.filter((s: any) => s.attributes?.colorHex);
+                const otherVariants = product.sizes.filter((s: any) => !s.attributes?.colorHex);
+                return (
+                  <div className="space-y-3">
+                    {/* Color variants — circles only like Clinique */}
+                    {colorVariants.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
+                          {selectedVariant?.attributes?.isColor ? selectedVariant.label : 'Couleur'}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {colorVariants.map((size: any) => {
+                            const isSelected = selectedVariant?.id === size.id;
+                            const displayName = /^\d+$/.test(size.label) ? `Teinte ${size.label}` : size.label;
+                            return (
+                              <button
+                                key={size.id}
+                                onClick={() => {
+                                  setSelectedVariant(isSelected ? null : { ...size, label: displayName });
+                                  if (size.image && !isSelected) setDisplayImage(size.image);
+                                  else setDisplayImage(product.images[0]);
+                                }}
+                                className={cn(
+                                  'w-7 h-7 rounded-full transition-all',
+                                  isSelected
+                                    ? 'ring-2 ring-[#1A1A1A] ring-offset-2'
+                                    : 'ring-1 ring-neutral-200 hover:ring-neutral-400',
+                                  !size.available && 'opacity-30 cursor-not-allowed'
+                                )}
+                                style={{ backgroundColor: size.attributes.colorHex }}
+                                disabled={!size.available}
+                                title={displayName}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Non-color variants — text pills */}
+                    {otherVariants.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
+                          {selectedVariant && !selectedVariant.attributes?.isColor ? selectedVariant.label : 'Format'}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {otherVariants.map((size: any) => {
+                            const isSelected = selectedVariant?.id === size.id;
+                            return (
+                              <button
+                                key={size.id}
+                                onClick={() => {
+                                  setSelectedVariant(isSelected ? null : size);
+                                  if (size.image && !isSelected) setDisplayImage(size.image);
+                                  else setDisplayImage(product.images[0]);
+                                }}
+                                className={cn(
+                                  'px-3 py-1 text-[11px] rounded border transition-all',
+                                  isSelected
+                                    ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
+                                    : size.available
+                                      ? 'border-neutral-200 hover:border-neutral-400 text-neutral-600'
+                                      : 'border-neutral-100 text-neutral-300 cursor-not-allowed opacity-40'
+                                )}
+                                disabled={!size.available}
+                              >
+                                {size.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {selectedVariant?.price && (
-                    <p className="text-xs text-[#B76E79] mt-1.5">{selectedVariant.price.toFixed(2)} €</p>
-                  )}
-                </div>
-              )}
+                );
+              })()}
 
               {/* Short description — NOT repeated in col 3 */}
               {product.translation.benefits && product.translation.benefits.length > 0 && (
