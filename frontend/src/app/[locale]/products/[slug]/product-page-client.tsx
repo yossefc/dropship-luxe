@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
@@ -110,6 +110,8 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
   const t = useTranslations();
   const { addItem, openCart, getTotalItems } = useCartStore();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [displayImage, setDisplayImage] = useState<string>(product.images[0] || '');
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -223,11 +225,11 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
             {/* Col 1: Product Image — small, clean */}
             <div className="flex flex-col gap-3">
               <div className="aspect-square bg-neutral-50 rounded-lg overflow-hidden">
-                {product.images[0] && (
+                {displayImage && (
                   <img
-                    src={product.images[0]}
+                    src={displayImage}
                     alt={product.translation.name}
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain transition-opacity duration-200"
                   />
                 )}
               </div>
@@ -278,27 +280,49 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                 )}
               </div>
 
-              {/* Variants / Sizes */}
+              {/* Variants with color swatches + image change on click */}
               {product.sizes && product.sizes.length > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-neutral-500 mb-2 uppercase tracking-wide">Options</p>
+                  <p className="text-xs font-medium text-neutral-500 mb-2 uppercase tracking-wide">
+                    {selectedVariant ? selectedVariant.label : 'Choisir une option'}
+                  </p>
                   <div className="flex flex-wrap gap-2">
-                    {product.sizes.map((size) => (
-                      <button
-                        key={size.id}
-                        className={cn(
-                          'px-3 py-1.5 text-xs rounded border transition-colors',
-                          size.available
-                            ? 'border-neutral-300 hover:border-[#B76E79] text-neutral-700'
-                            : 'border-neutral-100 text-neutral-300 cursor-not-allowed'
-                        )}
-                        disabled={!size.available}
-                      >
-                        {size.label}
-                        {size.price && <span className="ml-1 text-neutral-400">({size.price.toFixed(2)} €)</span>}
-                      </button>
-                    ))}
+                    {product.sizes.map((size: any) => {
+                      const isSelected = selectedVariant?.id === size.id;
+                      const colorHex = size.attributes?.colorHex;
+                      const isColor = size.attributes?.isColor;
+                      return (
+                        <button
+                          key={size.id}
+                          onClick={() => {
+                            setSelectedVariant(isSelected ? null : size);
+                            if (size.image && !isSelected) setDisplayImage(size.image);
+                            else setDisplayImage(product.images[0]);
+                          }}
+                          className={cn(
+                            'flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border transition-all',
+                            isSelected
+                              ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
+                              : size.available
+                                ? 'border-neutral-200 hover:border-[#B76E79] text-neutral-700'
+                                : 'border-neutral-100 text-neutral-300 cursor-not-allowed opacity-50'
+                          )}
+                          disabled={!size.available}
+                        >
+                          {isColor && colorHex && (
+                            <span
+                              className="w-3 h-3 rounded-full border border-neutral-300 flex-shrink-0"
+                              style={{ backgroundColor: colorHex }}
+                            />
+                          )}
+                          {size.label}
+                        </button>
+                      );
+                    })}
                   </div>
+                  {selectedVariant?.price && (
+                    <p className="text-xs text-[#B76E79] mt-1.5">{selectedVariant.price.toFixed(2)} €</p>
+                  )}
                 </div>
               )}
 

@@ -101,6 +101,7 @@ async function getProductBySlug(locale: string, slug: string): Promise<ProductDa
         price: v.price !== p.sellingPrice ? v.price : undefined,
         available: v.stock > 0,
         image: v.image || null,
+        attributes: v.attributes || {},
       })),
       translation: {
         name: p.name,
