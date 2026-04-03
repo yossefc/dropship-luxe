@@ -280,48 +280,87 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                 )}
               </div>
 
-              {/* Variants with color swatches + image change on click */}
+              {/* Variants — image thumbnails when available, text buttons otherwise */}
               {product.sizes && product.sizes.length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-neutral-500 mb-2 uppercase tracking-wide">
                     {selectedVariant ? selectedVariant.label : 'Choisir une option'}
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {product.sizes.map((size: any) => {
-                      const isSelected = selectedVariant?.id === size.id;
-                      const colorHex = size.attributes?.colorHex;
-                      const isColor = size.attributes?.isColor;
-                      return (
-                        <button
-                          key={size.id}
-                          onClick={() => {
-                            setSelectedVariant(isSelected ? null : size);
-                            if (size.image && !isSelected) setDisplayImage(size.image);
-                            else setDisplayImage(product.images[0]);
-                          }}
-                          className={cn(
-                            'flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border transition-all',
-                            isSelected
-                              ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
-                              : size.available
-                                ? 'border-neutral-200 hover:border-[#B76E79] text-neutral-700'
-                                : 'border-neutral-100 text-neutral-300 cursor-not-allowed opacity-50'
-                          )}
-                          disabled={!size.available}
-                        >
-                          {isColor && colorHex && (
-                            <span
-                              className="w-3 h-3 rounded-full border border-neutral-300 flex-shrink-0"
-                              style={{ backgroundColor: colorHex }}
-                            />
-                          )}
-                          {size.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+
+                  {/* If variants have images → show as image thumbnails (like AliExpress) */}
+                  {product.sizes.some((s: any) => s.image) ? (
+                    <div className="flex flex-wrap gap-2">
+                      {product.sizes.map((size: any) => {
+                        const isSelected = selectedVariant?.id === size.id;
+                        // If name is just a number, show "Teinte X"
+                        const displayName = /^\d+$/.test(size.label) ? `Teinte ${size.label}` : size.label;
+                        return (
+                          <button
+                            key={size.id}
+                            onClick={() => {
+                              setSelectedVariant(isSelected ? null : { ...size, label: displayName });
+                              if (size.image && !isSelected) setDisplayImage(size.image);
+                              else setDisplayImage(product.images[0]);
+                            }}
+                            className={cn(
+                              'relative w-14 h-14 rounded border-2 overflow-hidden transition-all',
+                              isSelected
+                                ? 'border-[#1A1A1A] shadow-md'
+                                : size.available
+                                  ? 'border-neutral-200 hover:border-[#B76E79]'
+                                  : 'border-neutral-100 opacity-40 cursor-not-allowed'
+                            )}
+                            disabled={!size.available}
+                            title={displayName}
+                          >
+                            {size.image ? (
+                              <img src={size.image} alt={displayName} className="w-full h-full object-contain" />
+                            ) : (
+                              <span className="text-[10px] text-neutral-500">{displayName}</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* No images → text buttons with color swatches */
+                    <div className="flex flex-wrap gap-2">
+                      {product.sizes.map((size: any) => {
+                        const isSelected = selectedVariant?.id === size.id;
+                        const colorHex = size.attributes?.colorHex;
+                        const isColor = size.attributes?.isColor;
+                        const displayName = /^\d+$/.test(size.label) ? `Option ${size.label}` : size.label;
+                        return (
+                          <button
+                            key={size.id}
+                            onClick={() => {
+                              setSelectedVariant(isSelected ? null : { ...size, label: displayName });
+                            }}
+                            className={cn(
+                              'flex items-center gap-1.5 px-3 py-1.5 text-xs rounded border transition-all',
+                              isSelected
+                                ? 'border-[#1A1A1A] bg-[#1A1A1A] text-white'
+                                : size.available
+                                  ? 'border-neutral-200 hover:border-[#B76E79] text-neutral-700'
+                                  : 'border-neutral-100 text-neutral-300 cursor-not-allowed opacity-50'
+                            )}
+                            disabled={!size.available}
+                          >
+                            {isColor && colorHex && (
+                              <span
+                                className="w-3 h-3 rounded-full border border-neutral-200 flex-shrink-0"
+                                style={{ backgroundColor: colorHex }}
+                              />
+                            )}
+                            {displayName}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {selectedVariant?.price && (
-                    <p className="text-xs text-[#B76E79] mt-1.5">{selectedVariant.price.toFixed(2)} €</p>
+                    <p className="text-xs text-[#B76E79] mt-2">{selectedVariant.price.toFixed(2)} €</p>
                   )}
                 </div>
               )}
