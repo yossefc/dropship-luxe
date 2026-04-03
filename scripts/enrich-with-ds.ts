@@ -117,7 +117,7 @@ async function main() {
           if (props.length === 0) continue;
 
           const variantName = props
-            .map((prop: any) => prop.property_value_definition_name || prop.sku_property_value)
+            .map((prop: any) => prop.sku_property_value || prop.property_value_definition_name)
             .join(' / ');
 
           if (!variantName) continue;
@@ -137,7 +137,7 @@ async function main() {
             attributes: {
               properties: props.map((prop: any) => ({
                 name: prop.sku_property_name,
-                value: prop.property_value_definition_name || prop.sku_property_value,
+                value: prop.sku_property_value || prop.property_value_definition_name,
               })),
             },
             image: skuImage,

@@ -169,30 +169,32 @@ async function loadSubCategories(): Promise<SubCatRow[]> {
 // Map AliExpress category names → our subcategory slugs
 const CATEGORY_MAP: Record<string, string> = {
   // Soins
-  'Skin Care': 'hydratants-serums',
-  'Face Skin Care': 'hydratants-serums',
-  'Serum': 'hydratants-serums',
-  'Face Cream': 'hydratants-serums',
-  'Facial Care': 'hydratants-serums',
+  'Skin Care': 'hydratants',
+  'Face Skin Care': 'hydratants',
+  'Face Cream': 'hydratants',
+  'Facial Care': 'hydratants',
+  'Serum': 'serums',
   'Eye Care': 'soins-yeux',
   'Sun Care': 'solaires-autobronzants',
   'Sunscreen': 'solaires-autobronzants',
-  'Cleansing': 'demaquillants',
-  'Facial Cleanser': 'demaquillants',
+  'Cleansing': 'nettoyants',
+  'Facial Cleanser': 'nettoyants',
   'Face Mask': 'masques-visage',
   'Sheet Masks': 'masques-visage',
   'Body Care': 'mains-corps',
   'Body Lotion': 'mains-corps',
   'Hand Care': 'mains-corps',
   'Hand Cream': 'mains-corps',
+  'Lip Care': 'soins-levres',
   // Maquillage
-  'Makeup': 'maquillage-visage',
-  'Face Makeup': 'maquillage-visage',
-  'Foundation': 'maquillage-visage',
-  'Concealer': 'maquillage-visage',
-  'Powder': 'maquillage-visage',
-  'Eye Shadow': 'maquillage-yeux',
-  'Eyeshadow': 'maquillage-yeux',
+  'Makeup': 'fond-de-teint',
+  'Face Makeup': 'fond-de-teint',
+  'Foundation': 'fond-de-teint',
+  'Concealer': 'anti-cernes',
+  'Powder': 'poudre',
+  'Blush': 'blush-bronzer',
+  'Eye Shadow': 'maquillage-visage',
+  'Eyeshadow': 'maquillage-visage',
   'Mascara': 'maquillage-yeux',
   'Eyeliner': 'maquillage-yeux',
   'Eye Makeup': 'maquillage-yeux',
@@ -214,38 +216,80 @@ function mapToSubCategory(aliCategoryName: string, title: string, subCats: SubCa
     if (found) return found;
   }
 
-  // 2. Keyword detection from title
+  // 2. Keyword detection from title (order matters — most specific first)
   const lower = title.toLowerCase();
 
-  if (/perfum|fragranc|cologne|eau de|parfum|body mist/.test(lower)) {
-    return subCats.find(s => s.parentSlug === 'parfums') ?? null;
+  // Parfums
+  if (/perfum|fragranc|cologne|eau de|parfum|body mist|pheromone/.test(lower)) {
+    return subCats.find(s => s.slug === 'parfums') ?? null;
   }
-  if (/lipstick|lip gloss|lip liner|lip/.test(lower)) {
+  // Maquillage — Lèvres
+  if (/lipstick|lip gloss|lip liner|lip tint|lip colour|lip color/.test(lower)) {
     return subCats.find(s => s.slug === 'maquillage-levres') ?? null;
   }
-  if (/eyeshadow|mascara|eyeliner|eye makeup|eye shadow/.test(lower)) {
-    return subCats.find(s => s.slug === 'maquillage-yeux') ?? null;
-  }
-  if (/foundation|concealer|powder|blush|primer|base makeup/.test(lower)) {
+  // Maquillage — Fards à Paupières
+  if (/eyeshadow|eye shadow|palette.*eye|palette.*shimmer|palette.*nude/.test(lower)) {
     return subCats.find(s => s.slug === 'maquillage-visage') ?? null;
   }
-  if (/eye cream|eye care|dark circle|eye bag|eye contour/.test(lower)) {
+  // Maquillage — Mascara & Eyeliner
+  if (/mascara|eyeliner|eye liner/.test(lower)) {
+    return subCats.find(s => s.slug === 'maquillage-yeux') ?? null;
+  }
+  // Maquillage — Fond de Teint
+  if (/foundation|bb cream|cc cream|tinted|tint stick/.test(lower)) {
+    return subCats.find(s => s.slug === 'fond-de-teint') ?? null;
+  }
+  // Maquillage — Anti-Cernes
+  if (/concealer|anti.cerne|corrector/.test(lower)) {
+    return subCats.find(s => s.slug === 'anti-cernes') ?? null;
+  }
+  // Maquillage — Poudre
+  if (/powder|poudre|setting powder|compact/.test(lower)) {
+    return subCats.find(s => s.slug === 'poudre') ?? null;
+  }
+  // Maquillage — Blush & Bronzer
+  if (/blush|bronzer|highlighter|contour.*face/.test(lower)) {
+    return subCats.find(s => s.slug === 'blush-bronzer') ?? null;
+  }
+  // Soins — Yeux
+  if (/eye cream|eye care|dark circle|eye bag|eye contour|eye balm|eye serum/.test(lower)) {
     return subCats.find(s => s.slug === 'soins-yeux') ?? null;
   }
-  if (/sunscreen|spf|sun protection|uv/.test(lower)) {
+  // Soins — Solaires
+  if (/sunscreen|spf|sun protection|sun cream|sun stick/.test(lower)) {
     return subCats.find(s => s.slug === 'solaires-autobronzants') ?? null;
   }
-  if (/cleanser|remover|micellar|wash/.test(lower)) {
+  // Soins — Nettoyants
+  if (/cleanser|face wash|cleansing|foam wash/.test(lower)) {
+    return subCats.find(s => s.slug === 'nettoyants') ?? null;
+  }
+  // Soins — Démaquillants
+  if (/remover|micellar|cleansing oil|cotton.*towel|makeup remov/.test(lower)) {
     return subCats.find(s => s.slug === 'demaquillants') ?? null;
   }
-  if (/mask|masque|peel|sheet mask/.test(lower)) {
+  // Soins — Exfoliants
+  if (/exfoli|scrub|peel|aha|bha|acid.*peel/.test(lower)) {
+    return subCats.find(s => s.slug === 'exfoliants') ?? null;
+  }
+  // Soins — Lèvres
+  if (/lip balm|lip care|lip mask|lip sleeping|lip repair/.test(lower)) {
+    return subCats.find(s => s.slug === 'soins-levres') ?? null;
+  }
+  // Soins — Masques
+  if (/mask|masque|sheet mask|peel off mask/.test(lower)) {
     return subCats.find(s => s.slug === 'masques-visage') ?? null;
   }
-  if (/body|hand cream|lotion|body cream|hand care|foot/.test(lower)) {
+  // Soins — Mains & Corps
+  if (/body|hand cream|body lotion|body cream|hand care|foot|shower|bath/.test(lower)) {
     return subCats.find(s => s.slug === 'mains-corps') ?? null;
   }
-  if (/serum|cream|moistur|hyaluronic|vitamin|retinol|collagen|essence/.test(lower)) {
-    return subCats.find(s => s.slug === 'hydratants-serums') ?? null;
+  // Soins — Sérums (before hydratants — more specific)
+  if (/serum|sérum|essence|ampoule|elixir/.test(lower)) {
+    return subCats.find(s => s.slug === 'serums') ?? null;
+  }
+  // Soins — Hydratants (fallback for creams/moisturizers)
+  if (/cream|crème|moistur|hydrat|retinol|collagen|vitamin|nourish/.test(lower)) {
+    return subCats.find(s => s.slug === 'hydratants') ?? null;
   }
 
   return null;
@@ -664,7 +708,12 @@ async function importProduct(
         const skus = dsData.ae_item_sku_info_dtos?.ae_item_sku_info_d_t_o ?? [];
         for (const sku of skus) {
           const props = sku.ae_sku_property_dtos?.ae_sku_property_d_t_o ?? [];
-          const variantName = props.map((p: any) => p.property_value_definition_name || p.sku_property_value).join(' / ');
+          // sku_property_value = real name (wine red, 30ml), definition_name = code (SS32-06)
+          const variantName = props.map((p: any) => {
+            const realName = p.sku_property_value;
+            const propName = p.sku_property_name; // "Color", "NET WT", etc.
+            return realName || p.property_value_definition_name || '';
+          }).filter(Boolean).join(' / ');
           if (variantName) {
             const skuImg = props.find((p: any) => p.sku_image)?.sku_image ?? null;
             dsVariants.push({
@@ -807,20 +856,58 @@ async function importProduct(
 // ============================================================================
 
 const DEFAULT_SEARCHES = [
-  // SOINS
-  { keywords: 'hyaluronic acid serum face', category: 'soins' },
-  { keywords: 'eye cream anti wrinkle dark circles', category: 'soins' },
-  { keywords: 'sunscreen face spf50', category: 'soins' },
-  { keywords: 'makeup remover cleanser face', category: 'soins' },
-  { keywords: 'face mask sheet moisturizing', category: 'soins' },
-  { keywords: 'hand cream body lotion', category: 'soins' },
-  // MAQUILLAGE
-  { keywords: 'foundation concealer liquid face', category: 'maquillage' },
-  { keywords: 'eyeshadow palette mascara', category: 'maquillage' },
-  { keywords: 'lipstick lip gloss matte', category: 'maquillage' },
+  // ══════════════════════════════════════════════════
+  // SOINS — Hydratants
+  { keywords: 'face cream moisturizer hydrating women', category: 'soins' },
+  { keywords: 'night cream anti aging collagen women', category: 'soins' },
+  // SOINS — Sérums
+  { keywords: 'hyaluronic acid serum face women', category: 'soins' },
+  { keywords: 'vitamin c brightening serum face', category: 'soins' },
+  { keywords: 'retinol anti aging serum face', category: 'soins' },
+  // SOINS — Nettoyants
+  { keywords: 'facial cleanser gentle foam wash women', category: 'soins' },
+  // SOINS — Soins des Yeux
+  { keywords: 'eye cream anti wrinkle dark circles women', category: 'soins' },
+  // SOINS — Solaires
+  { keywords: 'sunscreen face spf50 protection lightweight', category: 'soins' },
+  // SOINS — Démaquillants
+  { keywords: 'makeup remover micellar water cleansing oil', category: 'soins' },
+  // SOINS — Exfoliants
+  { keywords: 'face exfoliator scrub peeling gel women', category: 'soins' },
+  { keywords: 'aha bha exfoliating toner peel face', category: 'soins' },
+  // SOINS — Soins des Lèvres
+  { keywords: 'lip balm moisturizing repair care women', category: 'soins' },
+  { keywords: 'lip mask sleeping collagen repair women', category: 'soins' },
+  // SOINS — Masques
+  { keywords: 'face mask sheet moisturizing collagen women', category: 'soins' },
+  // SOINS — Mains & Corps
+  { keywords: 'body lotion moisturizer cream women', category: 'soins' },
+  { keywords: 'hand cream shea butter moisturizing', category: 'soins' },
+  // ══════════════════════════════════════════════════
+  // MAQUILLAGE — Fond de Teint
+  { keywords: 'liquid foundation full coverage natural women', category: 'maquillage' },
+  { keywords: 'bb cream cc cream tinted moisturizer women', category: 'maquillage' },
+  // MAQUILLAGE — Anti-Cernes
+  { keywords: 'concealer liquid full coverage dark circles women', category: 'maquillage' },
+  // MAQUILLAGE — Poudre
+  { keywords: 'face powder setting powder compact women', category: 'maquillage' },
+  { keywords: 'translucent powder loose setting makeup', category: 'maquillage' },
+  // MAQUILLAGE — Blush & Bronzer
+  { keywords: 'blush powder cheek natural glow women', category: 'maquillage' },
+  { keywords: 'bronzer highlighter contour powder palette', category: 'maquillage' },
+  // MAQUILLAGE — Mascara & Eyeliner
+  { keywords: 'mascara waterproof volume lengthening women', category: 'maquillage' },
+  { keywords: 'eyeliner liquid waterproof precision women', category: 'maquillage' },
+  // MAQUILLAGE — Fards à Paupières
+  { keywords: 'eyeshadow palette shimmer matte neutral women', category: 'maquillage' },
+  { keywords: 'eyeshadow palette nude warm tones women', category: 'maquillage' },
+  // MAQUILLAGE — Lèvres
+  { keywords: 'lipstick matte velvet long lasting women', category: 'maquillage' },
+  { keywords: 'lip gloss moisturizing shine plumping women', category: 'maquillage' },
+  // ══════════════════════════════════════════════════
   // PARFUMS
-  { keywords: 'perfume women long lasting luxury', category: 'parfums' },
-  { keywords: 'women eau de parfum floral', category: 'parfums' },
+  { keywords: 'perfume women eau de parfum long lasting', category: 'parfums' },
+  { keywords: 'women floral fruity perfume luxury', category: 'parfums' },
 ];
 
 // ============================================================================
