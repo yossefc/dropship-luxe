@@ -283,13 +283,14 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                 )}
               </div>
 
-              {/* Variants — Clinique style: color circles only, text for non-colors */}
+              {/* Variants — Clinique style */}
               {product.sizes && product.sizes.length > 0 && (() => {
                 const colorVariants = product.sizes.filter((s: any) => s.attributes?.colorHex);
-                const otherVariants = product.sizes.filter((s: any) => !s.attributes?.colorHex);
+                const imageVariants = product.sizes.filter((s: any) => !s.attributes?.colorHex && s.image);
+                const textVariants = product.sizes.filter((s: any) => !s.attributes?.colorHex && !s.image);
                 return (
                   <div className="space-y-3">
-                    {/* Color variants — circles only like Clinique */}
+                    {/* Color swatches — circles like Clinique */}
                     {colorVariants.length > 0 && (
                       <div>
                         <p className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
@@ -298,12 +299,11 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                         <div className="flex flex-wrap gap-1.5">
                           {colorVariants.map((size: any) => {
                             const isSelected = selectedVariant?.id === size.id;
-                            const displayName = /^\d+$/.test(size.label) ? `Teinte ${size.label}` : size.label;
                             return (
                               <button
                                 key={size.id}
                                 onClick={() => {
-                                  setSelectedVariant(isSelected ? null : { ...size, label: displayName });
+                                  setSelectedVariant(isSelected ? null : size);
                                   if (size.image && !isSelected) setDisplayImage(size.image);
                                   else setDisplayImage(product.images[0]);
                                 }}
@@ -316,7 +316,7 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                                 )}
                                 style={{ backgroundColor: size.attributes.colorHex }}
                                 disabled={!size.available}
-                                title={displayName}
+                                title={size.label}
                               />
                             );
                           })}
@@ -324,14 +324,47 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                       </div>
                     )}
 
-                    {/* Non-color variants — text pills */}
-                    {otherVariants.length > 0 && (
+                    {/* Image variants — mini circles with product image */}
+                    {imageVariants.length > 0 && (
                       <div>
                         <p className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">
-                          {selectedVariant && !selectedVariant.attributes?.isColor ? selectedVariant.label : 'Format'}
+                          {selectedVariant && !selectedVariant.attributes?.isColor ? selectedVariant.label : 'Variante'}
                         </p>
                         <div className="flex flex-wrap gap-1.5">
-                          {otherVariants.map((size: any) => {
+                          {imageVariants.map((size: any) => {
+                            const isSelected = selectedVariant?.id === size.id;
+                            return (
+                              <button
+                                key={size.id}
+                                onClick={() => {
+                                  setSelectedVariant(isSelected ? null : size);
+                                  if (!isSelected) setDisplayImage(size.image);
+                                  else setDisplayImage(product.images[0]);
+                                }}
+                                className={cn(
+                                  'w-8 h-8 rounded-full overflow-hidden transition-all',
+                                  isSelected
+                                    ? 'ring-2 ring-[#1A1A1A] ring-offset-2'
+                                    : 'ring-1 ring-neutral-200 hover:ring-neutral-400',
+                                  !size.available && 'opacity-30 cursor-not-allowed'
+                                )}
+                                disabled={!size.available}
+                                title={size.label}
+                              >
+                                <img src={size.image} alt={size.label} className="w-full h-full object-cover" />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Text variants — volumes, quantities */}
+                    {textVariants.length > 0 && (
+                      <div>
+                        <p className="text-[10px] text-neutral-400 uppercase tracking-wider mb-2">Format</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {textVariants.map((size: any) => {
                             const isSelected = selectedVariant?.id === size.id;
                             return (
                               <button
