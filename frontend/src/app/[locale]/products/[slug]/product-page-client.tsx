@@ -3,6 +3,7 @@
 import { useCallback, useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { useTranslations } from 'next-intl';
+import { cn } from '@/lib/utils';
 import { ShoppingBag, ArrowLeft } from 'lucide-react';
 import { ProductGallery } from '@/components/product/product-gallery-i18n';
 import { ProductInfo, type ProductInfoData, type ShadeOption, type SizeOption } from '@/components/product/product-info-i18n';
@@ -301,10 +302,16 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                 </div>
               )}
 
-              {/* Subtitle / Short description */}
-              <p className="text-sm text-neutral-500 leading-relaxed">
-                {product.translation.description.split('.').slice(0, 2).join('.') + '.'}
-              </p>
+              {/* Short description — NOT repeated in col 3 */}
+              {product.translation.benefits && product.translation.benefits.length > 0 && (
+                <ul className="space-y-1">
+                  {product.translation.benefits.slice(0, 3).map((b, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-xs text-neutral-500">
+                      <span className="text-[#B76E79] mt-0.5">✦</span> {b}
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               {/* Add to Cart */}
               <button
@@ -321,41 +328,48 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
               )}
             </div>
 
-            {/* Col 3: Details — description, benefits, ingredients, how to use */}
+            {/* Col 3: Product details — what you're buying */}
             <div className="flex flex-col gap-4 text-sm">
-              {/* Benefits */}
-              {product.translation.benefits && product.translation.benefits.length > 0 && (
+              {/* Description */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#B76E79] mb-2">Description</h3>
+                <p className="text-xs text-neutral-600 leading-relaxed">
+                  {product.translation.description}
+                </p>
+              </div>
+
+              {/* Product info — what you get */}
+              <div className="bg-[#F9F8F6] rounded-lg p-4 space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#1A1A1A] mb-2">Ce que vous recevez</h3>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="text-neutral-400">Catégorie</div>
+                  <div className="text-neutral-700">{product.category}</div>
+                  {product.sizes && product.sizes.length > 0 && (
+                    <>
+                      <div className="text-neutral-400">Options disponibles</div>
+                      <div className="text-neutral-700">{product.sizes.length} variante{product.sizes.length > 1 ? 's' : ''}</div>
+                    </>
+                  )}
+                  <div className="text-neutral-400">Marque</div>
+                  <div className="text-neutral-700">{product.brand}</div>
+                  <div className="text-neutral-400">Livraison</div>
+                  <div className="text-neutral-700">7-20 jours ouvrés</div>
+                  <div className="text-neutral-400">Retours</div>
+                  <div className="text-neutral-700">30 jours</div>
+                </div>
+              </div>
+
+              {/* Variant images — if variants have images, show them */}
+              {product.sizes && product.sizes.some((s: any) => s.image) && (
                 <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-[#B76E79] mb-2">Bienfaits</h3>
-                  <ul className="space-y-1.5">
-                    {product.translation.benefits.map((b, i) => (
-                      <li key={i} className="flex items-start gap-2 text-neutral-600">
-                        <span className="w-1 h-1 rounded-full bg-[#B76E79] mt-1.5 flex-shrink-0" />
-                        {b}
-                      </li>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Aperçu des variantes</h3>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {product.sizes.filter((s: any) => s.image).slice(0, 8).map((s: any) => (
+                      <div key={s.id} className="aspect-square bg-neutral-50 rounded overflow-hidden border border-neutral-100" title={s.label}>
+                        <img src={s.image} alt={s.label} className="w-full h-full object-contain" />
+                      </div>
                     ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Description long */}
-              {product.translation.descriptionHtml && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Description</h3>
-                  <div
-                    className="text-neutral-600 leading-relaxed prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: product.translation.descriptionHtml }}
-                  />
-                </div>
-              )}
-
-              {/* Ingredients */}
-              {product.translation.ingredients && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Composition</h3>
-                  <p className="text-xs text-neutral-500 font-mono bg-neutral-50 p-3 rounded leading-relaxed">
-                    {product.translation.ingredients}
-                  </p>
+                  </div>
                 </div>
               )}
 
@@ -363,7 +377,7 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
               {product.translation.howToUse && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Utilisation</h3>
-                  <p className="text-neutral-600 whitespace-pre-line leading-relaxed">
+                  <p className="text-xs text-neutral-600 whitespace-pre-line leading-relaxed">
                     {product.translation.howToUse}
                   </p>
                 </div>
