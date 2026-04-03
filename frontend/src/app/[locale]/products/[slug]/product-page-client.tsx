@@ -268,15 +268,18 @@ export function ProductPageClient({ product }: ProductPageClientProps): JSX.Elem
                 <span className="text-xs text-neutral-400">({product.reviewCount})</span>
               </div>
 
-              {/* Price */}
+              {/* Price — updates when variant selected */}
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-light text-[#1A1A1A]">
-                  {product.price.toFixed(2)} €
+                  {(selectedVariant?.price ?? product.price).toFixed(2)} €
                 </span>
-                {product.originalPrice && product.originalPrice > product.price && (
+                {!selectedVariant && product.originalPrice && product.originalPrice > product.price && (
                   <span className="text-sm text-neutral-400 line-through">
                     {product.originalPrice.toFixed(2)} €
                   </span>
+                )}
+                {product.sizes && product.sizes.length > 0 && !selectedVariant && (
+                  <span className="text-xs text-neutral-400">à partir de</span>
                 )}
               </div>
 
